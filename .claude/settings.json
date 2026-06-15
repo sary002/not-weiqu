@@ -1,0 +1,49 @@
+{
+  "project": {
+    "name": "不委屈 (Not委屈)",
+    "stage": "product-design",
+    "language": "zh-CN",
+    "defaultAgent": "coordinator"
+  },
+  "agents": {
+    "coordinator":        { "file": "agents/coordinator.md",        "model": "opus"   },
+    "product-manager":    { "file": "agents/product-manager.md",    "model": "sonnet" },
+    "architect":          { "file": "agents/architect.md",          "model": "opus"   },
+    "prompt-engineer":    { "file": "agents/prompt-engineer.md",    "model": "sonnet" },
+    "knowledge-engineer": { "file": "agents/knowledge-engineer.md", "model": "sonnet" },
+    "frontend":           { "file": "agents/frontend.md",           "model": "sonnet" },
+    "backend":            { "file": "agents/backend.md",            "model": "sonnet" },
+    "tester":             { "file": "agents/tester.md",             "model": "sonnet" }
+  },
+  "commands": {
+    "dir": "commands/",
+    "list": ["start", "plan", "design", "review", "status", "handoff"]
+  },
+  "rules": {
+    "order": [
+      "rules/governance.md",
+      "rules/workflow.md",
+      "rules/quality.md",
+      "rules/safety.md"
+    ]
+  },
+  "docs": {
+    "product":     "docs/product/",
+    "architecture":"docs/architecture/",
+    "decisions":   "docs/decisions/"
+  },
+  "safety": {
+    "userPopulation": "讨好型人格 / 边界敏感人群",
+    "mustNot": [
+      "diagnose",
+      "treat",
+      "shame",
+      "collect-identifying-info"
+    ],
+    "alwaysEscalateToHuman": [
+      "用户表达自伤/他伤意图",
+      "急性情绪危机",
+      "疑似精神疾病急性期"
+    ]
+  }
+}
