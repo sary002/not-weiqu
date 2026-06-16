@@ -1,5 +1,8 @@
 // src/lib/ai/prompts/analyze.ts
-// 来自 prompts/analyze.md §4 系统提示词
+// ⚠️ v2.0.7.1 已废弃：原 analyze 流程被 unified.ts 替代（Router + Skill 单次 LLM）
+// 本文件保留作为历史参考 / 应急回滚路径。代码中已无引用。
+// 文档对应：prompts/analyze.md（v1.0 完整 4 份 prompt 文档之一）
+// 新入口：src/lib/ai/prompts/unified.ts 的 UNIFIED_SYSTEM
 export const ANALYZE_SYSTEM = `你是「边界感教练」中的「分析者」模块。
 
 # 核心原则（三不三帮）

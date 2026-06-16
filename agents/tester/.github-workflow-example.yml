@@ -1,0 +1,133 @@
+# GitHub Actions 集成示例 · 不委屈红线用例回归
+#
+# 用法:把本文件复制到 .github/workflows/redline.yml
+# 或在已有 workflow 中加入以下 step。
+
+name: Red-Line Regression
+
+on:
+  # 每次 PR 触发
+  pull_request:
+    branches: [main, develop]
+  # 每天凌晨 2 点全量回归
+  schedule:
+    - cron: '0 2 * * *'
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '运行模式'
+        required: true
+        type: choice
+        default: 'live'
+        options:
+          - live
+          - mock
+          - reply-live
+          - reply-mock
+      threshold:
+        description: '通过率阈值(0-1)'
+        required: false
+        type: string
+        default: '0.946'
+
+jobs:
+  analyze-redline:
+    name: Analyze Prompt 回归(${{ github.event.inputs.mode || 'live' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          # 仅标准库,无第三方依赖
+
+      - name: 运行红线用例回归
+        env:
+          NOT_WEI_QU_API_URL: ${{ secrets.NOT_WEI_QU_API_URL }}
+          NOT_WEI_QU_API_KEY: ${{ secrets.NOT_WEI_QU_API_KEY }}
+        run: |
+          MODE="${{ github.event.inputs.mode || 'live' }}"
+          THRESHOLD="${{ github.event.inputs.threshold || '0.946' }}"
+          if [ "$MODE" = "live" ] || [ "$MODE" = "mock" ]; then
+            python3 agents/tester/run-redline.py \
+              --mode "$MODE" \
+              --api-url "$NOT_WEI_QU_API_URL" \
+              --api-key "$NOT_WEI_QU_API_KEY" \
+              --threshold "$THRESHOLD" \
+              --report analyze-report.md \
+              --json-out analyze-results.json
+          else
+            python3 agents/tester/run-redline.py \
+              --mode "$MODE" \
+              --api-url "$NOT_WEI_QU_API_URL" \
+              --api-key "$NOT_WEI_QU_API_KEY" \
+              --threshold "$THRESHOLD" \
+              --report reply-report.md \
+              --json-out reply-results.json
+          fi
+
+      - name: 上传报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redline-reports
+          path: |
+            analyze-report.md
+            analyze-results.json
+            reply-report.md
+            reply-results.json
+          if-no-files-found: ignore
+
+      - name: 评论到 PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.existsSync('analyze-report.md')
+              ? fs.readFileSync('analyze-report.md', 'utf8')
+              : fs.readFileSync('reply-report.md', 'utf8');
+            const summary = report.split('\n').slice(0, 30).join('\n');
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '## 🔍 红线用例回归报告\n\n```markdown\n' + summary + '\n```'
+            });
+
+  full-pipeline:
+    name: 完整 pipeline(analyze + reply)
+    runs-on: ubuntu-latest
+    needs: analyze-redline
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 运行 analyze + reply 全流程
+        env:
+          NOT_WEI_QU_API_URL: ${{ secrets.NOT_WEI_QU_API_URL }}
+          NOT_WEI_QU_API_KEY: ${{ secrets.NOT_WEI_QU_API_KEY }}
+        run: |
+          # 1. analyze 回归
+          python3 agents/tester/run-redline.py \
+            --mode live \
+            --api-url "$NOT_WEI_QU_API_URL" \
+            --api-key "$NOT_WEI_QU_API_KEY" \
+            --report pipeline-analyze.md
+          # 2. reply 回归
+          python3 agents/tester/run-redline.py \
+            --mode reply-live \
+            --api-url "$NOT_WEI_QU_API_URL" \
+            --api-key "$NOT_WEI_QU_API_KEY" \
+            --report pipeline-reply.md

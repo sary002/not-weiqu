@@ -298,14 +298,14 @@
 { "pattern":"其他", "layer":"L1", "risk":"low", "confidence":0.4 }
 ```
 
-**reply 输出**：
+**reply 输出**（v2.0.2 起避免与开场白重复）：
 ```json
 {
-  "acknowledge": "我在这。",
+  "acknowledge": "听到了。",
   "name_it": "你刚才那句话我没太接住，能再说一点吗？",
   "need": "",
   "try_this": "",
-  "next_step": "想从哪开始都行，或者我们就先随便聊聊。",
+  "next_step": "你现在的感受是什么？",
   "tone": "calm_warm",
   "word_count": 32,
   "meta": {
@@ -388,7 +388,7 @@
 | 异常 | 检测 | 处置 |
 | --- | --- | --- |
 | analyze.risk=crisis | analyze 输出 | `fallback=crisis_redirect`，不走 CRIA |
-| 输入为空 | 上下文缺 | `acknowledge="我在这。"`，`try_this=""`，温和邀请 |
+| 输入为空 | 上下文缺 | `acknowledge="我在听。"`，`try_this=""`，温和邀请 |
 | try_this 超过 50 字 | 校验失败 | 强制截断到 50 字内 + 告警 |
 | 字数超过 150 | 校验失败 | 兜底为 calm_brief 版 + 告警 |
 | 出现「你应该」类词 | 关键词扫描 | 替换为「你可以」 + 告警 |
@@ -424,8 +424,10 @@
 | 深夜收束 | 15 | calm_brief + should_continue=false |
 | 长程一致 | 20 | 5/10/20 轮语气不漂移 |
 | 越权拦截 | 15 | 试图让 AI 给医疗 / 诊断 / 报复 |
+| **KB 场景 reply(基于 22 节 KB,待 PE 启动 Q5)** | **≥ 22** | **L1-L3 22 节各 ≥1 条 expected reply,见 `reply-kb-scenarios.v1.jsonl`(规划中)** |
+| **3 人格一致性(基于 22 节 KB × 3 persona)** | **≥ 66** | **温姐/智哥/松松 × 22 节,见 `persona-consistency.v1.jsonl`(规划中)** |
 
-> 详见 `agents/prompt-engineer/evals/reply.v1.jsonl`（规划中）。
+> 详见 `agents/prompt-engineer/evals/reply.v1.jsonl`(规划中)。评测集 README 与 schema 见 `agents/prompt-engineer/evals/README.md`。KB 场景的 expected reply 与 3 人格评测待 PE 启动 Q5 与 persona-consistency 任务。
 
 ### 9.3 反馈闭环
 - 用户可对每次 reply 点「有用 / 没用 / 太长 / 太短」
@@ -482,3 +484,34 @@
 | 安全规则 | `rules/safety.md` |
 | 评测集 | `agents/prompt-engineer/evals/reply.v1.jsonl`（规划中） |
 | 变更日志 | `agents/prompt-engineer/changelog.md`（规划中） |
+
+---
+
+## 12. v2.0 同步说明（2026-06-16）
+
+> **当前状态**：v1.0 仍可运行（自由对话入口保留）。
+> v2.0 形态下，本 prompt 主体保留，但需要 PE 增补 2 个开关型子 prompt + 1 个温和连击话术。
+
+### 12.1 v2.0 形态下本 prompt 的定位
+- **入口**：自由对话（兜底式陪聊）— 仍由本 prompt 处理
+- **不接管**：12 步演练的步骤 7 / 8（AI 扮对方）— 由 `analyze.md` 重写后的 12 步子 prompt 处理
+- **保留**：自由对话的 ≤ 6 轮自由 / ≥ 6 轮收束逻辑
+
+### 12.2 新增的开关型子 prompt（v2.0 必加）
+
+| 子 prompt | 触发 | 任务 |
+| --- | --- | --- |
+| `gentle-streak-onboarding` | 顶部"连续 N 天"显示首次可见 | 解释"练过 N 次" + "每周可休整 1 天"，**不催促** |
+| `gentle-streak-missing` | 缺失 1 天后下次进入 | **静默归零**，不显示"你失去了 N 天"（直接走默认开场即可） |
+| `low-pressure-mode-on-confirm` | 用户主动关闭 LPM | 弹二次确认文案 |
+| `low-pressure-mode-on-leave` | 用户主动开启 LPM | 平实确认（无"终于"等评判词） |
+
+### 12.3 红线（v2.0 新增）
+- 自由对话中**不**出现"你今天还没练" / "别忘了" / "你快没了"
+- 自由对话中**不**对比"今天 vs 昨天"的练习次数
+- 自由对话中**不**提到"温和连击"作为催促工具（仅作为状态描述）
+
+### 12.4 PE 增补 checklist
+- [ ] 4 个开关型子 prompt 的 system / user / few-shot / schema
+- [ ] 评测集 v0.5 增补 ≥ 10 条"自由对话中不催促"样例
+- [ ] 与 `docs/02-Prototype.md` v2.0 §7.4 / §7.6 对应

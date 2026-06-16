@@ -30,8 +30,14 @@ export const replyOutputSchema = z.object({
   word_count: z.number().int().min(0).max(150),
   meta: z.object({
     should_continue: z.boolean(),
-    fallback: z.enum(['crisis_redirect', 'model_timeout', 'no_input', 'none']).nullable(),
+    fallback: z
+      .enum(['crisis_redirect', 'model_timeout', 'no_input', 'none', 'skill_drill_ok', 'skill_drill_local', 'skill_fd_ok', 'skill_fd_local'])
+      .nullable(),
     kb_refs: z.array(z.string()).max(3),
+    // v2.0.7 新增：crisis 路径让前端渲染兜底页
+    action_hint: z.string().optional(),
+    // v2.0.7 新增：连续 fallback 时提示用户
+    hint: z.string().optional(),
   }),
 });
 

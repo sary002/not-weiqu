@@ -3,7 +3,8 @@
 
 export type ApiErrorCode =
   | 'NW-AU-0001' | 'NW-AU-0002' | 'NW-AU-0003'
-  | 'NW-CO-0001' | 'NW-CO-0002' | 'NW-CO-0003' | 'NW-CO-0010'
+  | 'NW-CO-0001' | 'NW-CO-0002' | 'NW-CO-0003'
+  | 'NW-CO-0010' | 'NW-CO-0011'
   | 'NW-CR-0001' | 'NW-CR-0002'
   | 'NW-KB-0001'
   | 'NW-SC-0001'
@@ -20,7 +21,9 @@ export const ERROR_CATALOG: Record<ApiErrorCode, { http: number; user_message: s
   'NW-CO-0001': { http: 404, user_message: '这次对话不存在' },
   'NW-CO-0002': { http: 410, user_message: '这次对话已经结束' },
   'NW-CO-0003': { http: 422, user_message: '聊得挺深了，要不要先停一下？' },
-  'NW-CO-0010': { http: 503, user_message: '我们这会有点忙，再说一次？' },
+  // v2.0.4: 内容校验
+  'NW-CO-0010': { http: 400, user_message: '想说的话还没打出来，写几个字也行。' },
+  'NW-CO-0011': { http: 422, user_message: '这段有点长，先说最想说的那一段吧。' },
   // Crisis（HTTP 200，由前端根据 action_hint 渲染兜底页）
   'NW-CR-0001': {
     http: 200,
@@ -68,7 +71,13 @@ export class ApiError extends Error {
   }
 }
 
-export function jsonError(code: ApiErrorCode, trace_id: string) {
+/**
+ * 返回统一格式的错误响应
+ * @param code 错误码
+ * @param trace_id 请求追踪 ID
+ * @param httpOverride 可选：覆盖 catalog 中的 HTTP 状态码
+ */
+export function jsonError(code: ApiErrorCode, trace_id: string, httpOverride?: number) {
   const e = ERROR_CATALOG[code];
   return Response.json(
     {
@@ -80,6 +89,6 @@ export function jsonError(code: ApiErrorCode, trace_id: string) {
         trace_id,
       },
     },
-    { status: e.http },
+    { status: httpOverride ?? e.http },
   );
 }

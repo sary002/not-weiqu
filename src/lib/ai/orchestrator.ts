@@ -1,16 +1,26 @@
 // src/lib/ai/orchestrator.ts
-// AI 编排器：analyze → reply → RAG → 兜底
-// 来自 docs/03-System-Architecture.md §6
+// v2.0.7.1 三层架构（代码层）+ 1 次 LLM（runtime 层）
+// Router → Skill Agent → Response
+// 三层职责清晰，但底层用 1 次 LLM 调用（function-calling 模式）
+// 单次输入 ≤ 1000 token / 输出 ≤ 400 token / 0 次 KB 全文注入
 
-import { makeLLM, type LLMResponse, type LLMOptions, safeJson as importedSafeJson } from './llm-client';
-import { ANALYZE_SYSTEM } from './prompts/analyze';
-import { REPLY_SYSTEM } from './prompts/reply';
+import { makeLLM, safeJson, type LLMResponse, type LLMOptions } from './llm-client';
 import { detectCrisis } from '../safety/crisis-detector';
 import { uuid } from '../utils/id';
 import { searchKB, type KBRef } from '../kb/search';
+import { cacheGet, cacheSet, cacheKey, cacheStats, isCacheable } from './cache';
+import {
+  UNIFIED_SYSTEM,
+  buildUnifiedUserPrompt,
+  type UnifiedIntent,
+  type UnifiedOutput,
+  type UnifiedReplyDrill,
+  type UnifiedReplyFree,
+} from './prompts/unified';
 import { analyzeOutputSchema, replyOutputSchema, type AnalyzeOutput, type ReplyOutput } from './schemas';
-import { adaptReply, adaptAnalyze } from './response-adapter';
+import { z } from 'zod';
 
+// ============ 公共类型（向后兼容）============
 export interface ConversationContext {
   user_id: string;
   conversation_id: string;
@@ -28,6 +38,11 @@ export interface ProcessInput {
   conversation_id: string;
   user_input: string;
   context: ConversationContext;
+  /**
+   * v2.0.7.1: 调用方显式指定意图（跳过 Router）
+   * 演练步骤 9 由前端传 'drill'；危机由规则层覆盖；其他情况可省
+   */
+  intent_override?: 'crisis' | 'drill' | 'free_dialogue';
 }
 
 export interface ProcessOutput {
@@ -37,217 +52,320 @@ export interface ProcessOutput {
   kb_refs: KBRef[];
   crisis: ReturnType<typeof detectCrisis>;
   tokens: { in: number; out: number };
+  routing?: {
+    intent: UnifiedIntent;
+    brief: string;
+    skill_called: string;
+    calls_used: number;
+  };
 }
 
-/** 编排主流程：analyze → crisis check → RAG → reply */
-export async function process(input: ProcessInput): Promise<ProcessOutput> {
-  const trace_id = uuid();
-  const llm = makeLLM();
+// ============ Zod schema for unified output ============
+const drillReplySchema = z.object({
+  reply: z.string().min(2).max(200),
+  hint: z.string().max(200).optional(),
+});
+const freeReplySchema = z.object({
+  acknowledge: z.string().min(2).max(120),
+  name_it: z.string().min(2).max(200),
+  need: z.string().max(120).optional().default(''),
+  try_this: z.string().max(200).optional().default(''),
+  next_step: z.string().max(120).optional().default(''),
+});
+const crisisReplySchema = z.object({
+  acknowledge: z.string().max(120),
+  name_it: z.string().max(200),
+  need: z.string().optional().default(''),
+  try_this: z.string().optional().default(''),
+  next_step: z.string().optional().default(''),
+});
 
-  // 1. analyze（含规则层危机检测）
-  const ruleCrisis = detectCrisis(input.user_input);
-  const analyzeResult = await runAnalyze(llm, input, trace_id, ruleCrisis);
+const unifiedOutputSchema = z.object({
+  intent: z.enum(['crisis', 'drill', 'free_dialogue']),
+  brief: z.string().max(60),
+  reply: z.union([drillReplySchema, freeReplySchema, crisisReplySchema]),
+});
 
-  // 2. 若 rule 已检测到 crisis，强制升级（不依赖 LLM）
-  if (ruleCrisis.is_crisis) {
-    analyzeResult.risk = 'crisis';
-    analyzeResult.crisis_signals = ruleCrisis.matched;
-  }
-
-  // 3. RAG（仅非危机时召回，crisis 禁召）
-  let kb_refs: KBRef[] = [];
-  if (analyzeResult.risk !== 'crisis') {
-    kb_refs = await searchKB({
-      query: input.user_input,
-      layer: analyzeResult.layer,
-      pattern: analyzeResult.pattern,
-      emotions: analyzeResult.emotions,
-      top_k: 5,
-    });
-  }
-
-  // 4. reply
-  const replyResult = await runReply(llm, input, analyzeResult, kb_refs, trace_id);
-
+// ============ L0: 规则层（0 token）============
+function buildAnalyzeStub(routing: UnifiedOutput | null, ruleCrisis: ReturnType<typeof detectCrisis>): AnalyzeOutput {
   return {
-    trace_id,
-    analyze: analyzeResult,
-    reply: replyResult,
-    kb_refs,
-    crisis: ruleCrisis,
-    tokens: { in: input.user_input.length, out: 0 },
+    facts: routing ? [routing.brief] : [],
+    emotions: [],
+    needs: [],
+    pattern: '其他',
+    layer: 'L1',
+    risk: ruleCrisis.is_crisis ? 'crisis' : 'low',
+    crisis_signals: ruleCrisis.matched,
+    confidence: 0.5,
+    note: `v2.0.7.1 router:${routing?.intent ?? 'crisis_local'}`,
   };
 }
 
-async function runAnalyze(
-  llm: ReturnType<typeof makeLLM>,
-  input: ProcessInput,
-  trace_id: string,
-  ruleCrisis: ReturnType<typeof detectCrisis>,
-): Promise<AnalyzeOutput> {
-  const opts: LLMOptions = {
-    prompt_id: 'NW-PE-ANALYZE-001',
-    prompt_version: 'v1.0',
-    json_mode: true,
-    trace_id,
+// ============ 危机本地兜底（不调 LLM）============
+function buildCrisisLocal(): UnifiedOutput {
+  return {
+    intent: 'crisis',
+    brief: 'rule_crisis_hit',
+    reply: {
+      acknowledge: '我们现在不太好。',
+      name_it: '你愿意说出来，这件事本身就不容易。',
+      need: '',
+      try_this: '',
+      next_step: '',
+    },
   };
-  let res: LLMResponse;
+}
+
+// ============ 自由对话 fallback（不调 LLM）============
+function buildFreeDialogueFallback(userInput: string, turnCount: number): UnifiedOutput {
+  const turn = Math.max(1, turnCount);
+  const snippet = userInput.slice(0, 20);
+  const pools = [
+    {
+      acknowledge: '听到了。',
+      name_it: snippet ? `你刚才说的「${snippet}」，我想再听一点。` : '你愿意再多说一句吗？',
+    },
+    {
+      acknowledge: '嗯。',
+      name_it: snippet ? `你刚才那句「${snippet}」——能再具体说说吗？` : '能多说一点吗？',
+    },
+    {
+      acknowledge: '我在听。',
+      name_it: snippet ? `你那句「${snippet}」，我想确认我听对了。` : '你说慢一点也行。',
+    },
+  ];
+  const pick = pools[Math.min(turn - 1, pools.length - 1)];
+  return {
+    intent: 'free_dialogue',
+    brief: snippet || '情绪聊天',
+    reply: {
+      acknowledge: pick.acknowledge,
+      name_it: pick.name_it,
+      need: '',
+      try_this: '',
+      next_step: '',
+    },
+  };
+}
+
+// ============ Drill fallback（不调 LLM）============
+function buildDrillFallback(userInput: string): UnifiedOutput {
+  // 尝试从 user_input 提取"我刚说"的内容（支持中文/英文冒号 + 引号）
+  // 兼容："我刚说"今晚..."、"我刚说: ...、"我刚说：..."
+  const m = userInput.match(/我刚说\s*[:：]?\s*[""'']?([^""''\n，。；]+)[""'']?/);
+  const opener = m?.[1]?.trim() || '今晚有安排了。';
+  return {
+    intent: 'drill',
+    brief: '演练T9 收束',
+    reply: { reply: opener, hint: '' },
+  };
+}
+
+// ============ 1 次 LLM 调用：Router + Skill 合并 ============
+async function callUnified(
+  input: ProcessInput,
+  traceId: string,
+): Promise<UnifiedOutput> {
+  return callUnifiedInternal(input, undefined, traceId);
+}
+
+/**
+ * v2.0.7.1: 显式 intent 跳过 Router，直接调 Skill
+ * 调用方传 intent_override 时走这条路径
+ */
+async function callUnifiedWithIntent(
+  input: ProcessInput,
+  intent: 'crisis' | 'drill' | 'free_dialogue',
+  traceId: string,
+): Promise<UnifiedOutput> {
+  return callUnifiedInternal(input, intent, traceId);
+}
+
+async function callUnifiedInternal(
+  input: ProcessInput,
+  preRoutedIntent: 'crisis' | 'drill' | 'free_dialogue' | undefined,
+  traceId: string,
+): Promise<UnifiedOutput> {
+  const llm = makeLLM();
+  const opts: LLMOptions = {
+    prompt_id: 'NW-PE-UNIFIED-001',
+    prompt_version: 'v2.0.7.1',
+    json_mode: true,
+    trace_id: traceId,
+  };
+  const userPrompt = buildUnifiedUserPrompt(
+    input.user_input,
+    input.context.turn_count ?? 1,
+    !!input.context.is_first_message,
+    input.context.scenario,
+  );
   try {
-    res = await llm.chat(
+    const res: LLMResponse = await llm.chat(
       [
-        { role: 'system', content: ANALYZE_SYSTEM },
-        // 用更直白的人类语言而不是 JSON，避免 API 拒绝
-        { role: 'user', content:
-          `用户输入：${input.user_input}\n\n` +
-          `上下文：turn=${input.context.turn_count ?? 1}，hour=${input.context.hour_local ?? 'unknown'}\n\n` +
-          `规则检测：${ruleCrisis.is_crisis ? '危机信号命中' : '无危机信号'}\n\n` +
-          `请输出严格 JSON。`
-        },
+        { role: 'system', content: UNIFIED_SYSTEM },
+        { role: 'user', content: userPrompt },
       ],
       opts,
     );
-  } catch (e: any) {
-    console.error('[Orchestrator] analyze LLM failed, using rule-based fallback:', e?.message ?? e);
-    return ruleBasedAnalyze(input.user_input, ruleCrisis);
-  }
-  const parsed = analyzeOutputSchema.safeParse(safeJson(res.content));
-  if (!parsed.success) {
-    // 尝试智能适配
-    const adapted = adaptAnalyze(safeJson(res.content));
-    if (adapted) {
-      const reParsed = analyzeOutputSchema.safeParse(adapted);
-      if (reParsed.success) return reParsed.data;
+    const parsed = unifiedOutputSchema.safeParse(safeJson(res.content));
+    if (parsed.success) {
+      // 如果 preRoutedIntent 给定但 LLM 误判，强制修正（避免 router 误分类）
+      if (preRoutedIntent && parsed.data.intent !== preRoutedIntent) {
+        return { ...parsed.data, intent: preRoutedIntent };
+      }
+      return parsed.data;
     }
-    return ruleBasedAnalyze(input.user_input, ruleCrisis);
+    return preRoutedIntent
+      ? fallbackForIntent(preRoutedIntent, input.user_input, input.context.turn_count ?? 1)
+      : buildFreeDialogueFallback(input.user_input, input.context.turn_count ?? 1);
+  } catch (e) {
+    console.error('[Unified] LLM failed, fallback:', (e as Error)?.message);
+    return preRoutedIntent
+      ? fallbackForIntent(preRoutedIntent, input.user_input, input.context.turn_count ?? 1)
+      : buildFreeDialogueFallback(input.user_input, input.context.turn_count ?? 1);
   }
-  return parsed.data;
 }
 
-async function runReply(
-  llm: ReturnType<typeof makeLLM>,
-  input: ProcessInput,
-  analyze: AnalyzeOutput,
-  kb_refs: KBRef[],
-  trace_id: string,
-): Promise<ReplyOutput> {
-  if (analyze.risk === 'crisis') {
+function fallbackForIntent(
+  intent: 'crisis' | 'drill' | 'free_dialogue',
+  userInput: string,
+  turnCount: number,
+): UnifiedOutput {
+  if (intent === 'crisis') return buildCrisisLocal();
+  if (intent === 'drill') return buildDrillFallback(userInput);
+  return buildFreeDialogueFallback(userInput, turnCount);
+}
+
+// ============ 2) Skill Agent 适配器（按 intent 转 ReplyOutput）============
+function adaptToReplyOutput(
+  unified: UnifiedOutput,
+  ruleCrisis: ReturnType<typeof detectCrisis>,
+): ReplyOutput {
+  if (unified.intent === 'crisis') {
+    const r = unified.reply as { acknowledge?: string; name_it?: string };
     return {
-      acknowledge: '',
-      name_it: '',
+      acknowledge: r.acknowledge ?? '我们现在不太好。',
+      name_it: r.name_it ?? '你愿意说出来，这件事本身就不容易。',
       need: '',
       try_this: '',
       next_step: '',
       tone: 'calm_warm',
-      word_count: 0,
-      meta: { should_continue: false, fallback: 'crisis_redirect', kb_refs: [] },
+      word_count: (r.acknowledge?.length ?? 0) + (r.name_it?.length ?? 0),
+      meta: {
+        should_continue: false,
+        fallback: 'crisis_redirect',
+        kb_refs: [],
+        action_hint: 'show_crisis_resources',
+      },
     };
   }
-
-  const opts: LLMOptions = {
-    prompt_id: 'NW-PE-REPLY-001',
-    prompt_version: 'v1.0',
-    json_mode: true,
-    trace_id,
-  };
-  let res: LLMResponse;
-  try {
-    res = await llm.chat(
-      [
-        { role: 'system', content: REPLY_SYSTEM },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            analyze,
-            context: input.context,
-            kb_refs,
-          }),
-        },
-      ],
-      opts,
-    );
-  } catch (e: any) {
-    console.error('[Orchestrator] reply LLM failed, returning calm fallback:', e?.message ?? e);
+  if (unified.intent === 'drill') {
+    const r = unified.reply as UnifiedReplyDrill;
     return {
-      acknowledge: '我在这。',
-      name_it: '我听到你了。',
+      acknowledge: '',
+      name_it: '',
       need: '',
-      try_this: '',
-      next_step: '想从哪开始都行。',
+      try_this: r.reply,
+      next_step: r.hint ?? '',
       tone: 'calm_warm',
-      word_count: 24,
-      meta: { should_continue: true, fallback: 'model_timeout', kb_refs: [] },
+      word_count: r.reply.length,
+      meta: {
+        should_continue: false,
+        fallback: 'skill_drill_ok',
+        kb_refs: [],
+      },
     };
   }
-  const parsed = replyOutputSchema.safeParse(safeJson(res.content));
-  if (!parsed.success) {
-    // 智能适配：把 LLM 自创的 schema 翻译成我们的
-    const adapted = adaptReply(safeJson(res.content));
-    if (adapted) {
-      const reParsed = replyOutputSchema.safeParse(adapted);
-      if (reParsed.success) return reParsed.data;
-    }
-    return {
-      acknowledge: '我在这。',
-      name_it: '我听到你了。',
-      need: '',
-      try_this: '',
-      next_step: '想从哪开始都行。',
-      tone: 'calm_warm',
-      word_count: 24,
-      meta: { should_continue: true, fallback: 'model_timeout', kb_refs: [] },
-    };
-  }
-  return parsed.data;
-}
-
-/** 规则兜底 analyze（无 LLM 时使用） */
-function ruleBasedAnalyze(input: string, ruleCrisis: ReturnType<typeof detectCrisis>): AnalyzeOutput {
-  if (ruleCrisis.is_crisis) {
-    return {
-      facts: ['用户表达危机信号'],
-      emotions: ['绝望', '无力'],
-      needs: ['安全感', '被接住'],
-      pattern: '危机',
-      layer: 'L4',
-      risk: 'crisis',
-      crisis_signals: ruleCrisis.matched,
-      confidence: 0.9,
-      note: '规则兜底：危机信号命中',
-    };
-  }
-  if (/又让我|又要我|又让我帮|甩活|加班|催/.test(input)) {
-    return {
-      facts: ['用户被请求 / 越界'],
-      emotions: ['委屈', '内疚'],
-      needs: ['被尊重的时间', '拒绝的空间'],
-      pattern: '取悦',
-      layer: 'L3',
-      risk: 'low',
-      crisis_signals: [],
-      confidence: 0.8,
-      note: '规则兜底：取悦模式',
-    };
-  }
+  // free_dialogue
+  const r = unified.reply as UnifiedReplyFree;
   return {
-    facts: [],
-    emotions: ['unknown'],
-    needs: ['unknown'],
-    pattern: '其他',
-    layer: 'L1',
-    risk: 'low',
-    crisis_signals: [],
-    confidence: 0.4,
-    note: '规则兜底：输入不明确',
+    acknowledge: r.acknowledge,
+    name_it: r.name_it,
+    need: r.need ?? '',
+    try_this: r.try_this ?? '',
+    next_step: r.next_step ?? '',
+    tone: 'calm_warm',
+    word_count:
+      (r.acknowledge?.length ?? 0) +
+      (r.name_it?.length ?? 0) +
+      (r.need?.length ?? 0) +
+      (r.try_this?.length ?? 0) +
+      (r.next_step?.length ?? 0),
+    meta: {
+      should_continue: !ruleCrisis.is_crisis,
+      fallback: 'skill_fd_ok',
+      kb_refs: [],
+    },
   };
 }
 
-function safeJson(text: string): unknown {
-  // 重导出：使用 llm-client 中的智能版本（剥 <think> + markdown + 找首个 {）
-  return importedSafeJson(text);
-}
+// ============ 3) Response 合成 + 主入口 ============
+export async function process(input: ProcessInput): Promise<ProcessOutput> {
+  const traceId = uuid();
+  const ruleCrisis = detectCrisis(input.user_input);
+  let callsUsed = 0;
+  let totalIn = 0;
+  let totalOut = 0;
 
-// 保留同名校验：避免开发误用旧版
-function _ensureSafeJsonImported() {
-  if (typeof importedSafeJson !== 'function') throw new Error('safeJson import missing');
+  let unified: UnifiedOutput;
+
+  if (ruleCrisis.is_crisis) {
+    // ============ L0 规则层命中 → 不调 LLM ============
+    unified = buildCrisisLocal();
+  } else if (input.intent_override) {
+    // ============ v2.0.7.1: 调用方显式 intent → 跳过 Router，但仍调 1 次 LLM 完成 skill ============
+    callsUsed = 1;
+    unified = await callUnifiedWithIntent(input, input.intent_override, traceId);
+  } else {
+    // ============ L1 Router + L2 Skill 合并为 1 次 LLM ============
+    // v2.0.7.2: 先查 cache（5 分钟内同输入复用）
+    const key = cacheKey(
+      input.user_input,
+      input.context.turn_count ?? 1,
+      !!input.context.is_first_message,
+    );
+    const cached = cacheGet(key);
+    if (cached && isCacheable(cached)) {
+      callsUsed = 0;
+      unified = cached;
+    } else {
+      callsUsed = 1;
+      unified = await callUnified(input, traceId);
+      if (isCacheable(unified)) cacheSet(key, unified);
+    }
+  }
+
+  // KB 召回（仅 free_dialogue，且只在需要时）
+  let kbRefs: KBRef[] = [];
+  if (unified.intent === 'free_dialogue' && !ruleCrisis.is_crisis) {
+    kbRefs = await searchKB({
+      query: input.user_input.slice(0, 100),
+      top_k: 3,
+    });
+  }
+
+  // ============ L3 Response 合成 ============
+  const reply = adaptToReplyOutput(unified, ruleCrisis);
+  const analyze = buildAnalyzeStub(unified, ruleCrisis);
+
+  return {
+    trace_id: traceId,
+    analyze,
+    reply,
+    kb_refs: kbRefs,
+    crisis: ruleCrisis,
+    tokens: { in: totalIn, out: totalOut },
+    routing: {
+      intent: unified.intent,
+      brief: unified.brief,
+      skill_called: ruleCrisis.is_crisis
+        ? 'skill-crisis (local)'
+        : callsUsed === 0
+          ? 'cache-hit'
+          : unified.intent === 'drill'
+            ? 'skill-drill (llm)'
+            : 'skill-free-dialogue (llm)',
+      calls_used: callsUsed,
+    },
+  };
 }
-_ensureSafeJsonImported();

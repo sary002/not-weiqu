@@ -9,3 +9,6 @@ coverage
 dist
 .vercel
 .turbo
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo

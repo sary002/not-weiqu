@@ -477,3 +477,60 @@
 | 安全 | `rules/safety.md` |
 | 评测集 | `agents/prompt-engineer/evals/growth-report.v1.jsonl`（规划中） |
 | 变更日志 | `agents/prompt-engineer/changelog.md`（规划中） |
+
+---
+
+## 12. v2.0 同步说明（2026-06-16）
+
+> **当前状态**：v1.0 仍可运行。
+> v2.0 形态下，本 prompt 是 PE 集中重写工作量最大的一个。
+
+### 12.1 v2.0 形态调整
+
+| 项 | v1.0 | v2.0 |
+| --- | --- | --- |
+| 复盘页位置 | 独立底部 Tab | 收纳进「我」页 → 「进度」子页 |
+| 指标体系 | 月度曲线 + 30 日次数 | 区段掌握度 + 练过的瞬间 + 温和连击 |
+| 排名 / 排行榜 | （v1.0 已无） | **v2.0 仍无**（已拒绝） |
+| 文案 | "坚持 X 天" | "练过 N 次" |
+
+### 12.2 文案红线（v2.0 强约束，全产品对齐）
+
+| 场景 | ❌ 禁用 | ✅ 替换为 |
+| --- | --- | --- |
+| 报告标题 | "你的 30 天挑战报告" | "这 30 天的练习" |
+| 开场 | "你真棒！" | "多了一些练习" |
+| 数据 | "坚持 23 天" | "练过 23 次" |
+| 鼓励 | "再坚持 7 天就能解锁 X" | （无） |
+| 推送 | "别忘了明天练习" | "想练就练" |
+| 排名 | "排名上升 5 位" | （无） |
+| 季报结尾 | "挑战成功！🎉" | "下次想练就练" |
+
+### 12.3 输出 Schema v2.0 调整
+
+```json
+{
+  "period": "2026-05-17 ~ 2026-06-16",
+  "sections_mastery": [
+    { "id": "s1", "name": "觉察", "practiced": 8, "total": 12 },
+    { "id": "s2", "name": "命名", "practiced": 4, "total": 10 },
+    { "id": "s3", "name": "表达", "practiced": 2, "total": 15, "highlight": true },
+    { "id": "s4", "name": "兜底", "practiced": 0, "total": 9 },
+    { "id": "s5", "name": "巩固", "practiced": 0, "total": 6 }
+  ],
+  "practiced_count_total": 14,
+  "gentle_streak_current_days": 3,
+  "gentle_streak_longest_days": 17,
+  "small_wins": ["第一次平静地说「不」", "..."],
+  "next_try_optional": "可以试试 §4 兜底 - 应对愧疚感",
+  "disablable": true,
+  "no_metrics": ["checkin_days", "rank", "challenge_count"]
+}
+```
+
+### 12.4 PE 重写 checklist
+- [ ] 输出 Schema 重构为 v2.0 形态（5 段 + 累计 + 温和连击）
+- [ ] 删除"挑战" / "排名" / "打卡" / "坚持" 字段
+- [ ] 评测集 v0.5 增补 ≥ 10 条"v2.0 文案"样例
+- [ ] 与 `docs/02-Prototype.md` v2.0 §6.10 / §11 对应
+- [ ] 与 `docs/02-Prototype.md` §16.2 借鉴自检 + §16.3 拒绝清单 对应

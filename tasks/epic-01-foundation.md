@@ -562,12 +562,48 @@ CI / CD / 灰度 / 回滚完整流水线。
 | 关联 | 路径 |
 | --- | --- |
 | PRD | `docs/01-PRD.md` |
-| 原型 | `docs/02-Prototype.md` |
+| 原型 | `docs/02-Prototype.md` v2.0 |
 | 架构 | `docs/03-System-Architecture.md` |
 | 数据库 | `docs/04-Database-Design.md` |
-| API | `docs/05-API-Design.md` |
-| 测试 | `docs/07-Test-Plan.md` |
+| API | `docs/05-API-Design.md` v1.1 |
+| 测试 | `docs/07-Test-Plan.md` v1.1 |
 | 部署 | `docs/08-Deployment-Plan.md` |
 | 安全 | `rules/safety.md` |
 | 治理 | `rules/governance.md` |
 | 质量 | `rules/quality.md` |
+
+---
+
+## 12. v2.0 同步说明（2026-06-16）
+
+> 本 epic 主体保留 v1.0 范围（匿名档案 / 鉴权 / 数据权利 / 危机路径 / 可观测 / 部署）。
+> v2.0 引入 4 个新模块，需要在 M1-09 同步增补。
+
+### 12.1 新增模块（在 epic 01 内实现的部分）
+
+| ID | 任务 | Owner | 状态 |
+| --- | --- | --- | --- |
+| F-SKL-001 | 技能树主页（5 段骨架 + 节点 6 态组件） | FE | 待 M1-09 |
+| F-LPM-001 | 低压力模式开关 + 全局开关组件 | FE | 待 M1-09 |
+| F-LPM-002 | 推送控制（LPM ON 时 0 推送） | BE | 待 M1-09 |
+| F-STR-001 | 温和连击 + 休整日 | FE + BE | 待 M1-09 |
+| F-STR-002 | 休整日端点（最多 2 个/周） | BE | 待 M1-09 |
+| F-TOD-001 | 今日三件小事（1 必做 + 2 选做） | FE + BE | 待 M1-09 |
+
+### 12.2 调整模块
+
+| 原 v1.0 | 调整到 v2.0 |
+| --- | --- |
+| 7 Tab 导航 | 4 Tab 导航（今日 / 自由对话 / 我的剧本 / 我） |
+| 设置独立页 | 收纳进「我」页 |
+| 复盘独立页 | 收纳进「我 → 进度」子页 |
+
+### 12.3 拒绝清单自检（CI 必跑）
+
+> 详见 `docs/02-Prototype.md` §16.3 + `docs/07-Test-Plan.md` §19.6
+
+- 无 `/v1/hearts` `/v1/lives` `/v1/gems` `/v1/coins` `/v1/shop` 端点
+- 无 `/v1/leaderboard` `/v1/league` `/v1/rank` `/v1/checkin` 端点
+- 无 `/v1/streak-repair` `/v1/countdown` `/v1/flash-sale` 端点
+- 全代码库无 `Heart` / `Lives` / `Gem` / `Coin` / `Leaderboard` 类
+- 全代码库无 "失去" / "丢失" / "再不来就" / "🔥 红字" / "坚持 X 天" / "打卡" 字符串

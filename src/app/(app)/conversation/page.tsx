@@ -23,7 +23,14 @@ interface Message {
 export default function ConversationPage() {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // v2.0.2 fix: 进入页面就有 AI 开场白气泡，不再用空态占位
+  // 避免用户输入后看到"我在这"误以为 AI 没听见
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content: '我在这。\n\n想聊什么都行；不聊也行。',
+    },
+  ]);
   const [loading, setLoading] = useState(false);
   const [crisis, setCrisis] = useState<{ type: string } | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -52,7 +59,12 @@ export default function ConversationPage() {
       const res = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ content: text, client_msg_id: crypto.randomUUID() }),
+        // v2.0.3 fix: 把 turn_count 传给后端，让 fallback 能感知轮次
+        body: JSON.stringify({
+          content: text,
+          client_msg_id: crypto.randomUUID(),
+          turn_count: Math.floor(messages.length / 2) + 1,
+        }),
       });
       const data = await res.json();
       if (data.data?.crisis) {
@@ -63,21 +75,37 @@ export default function ConversationPage() {
         ]);
       } else if (data.data?.reply) {
         const r = data.data.reply;
+        // v2.0.3 fix: 后端 fallback 已经引用了用户原话 + 按 turn 切换措辞
+        // 这里只过滤孤立的"我在这"防重复，不再覆盖后端上下文感知
+        const parts = [
+          r.acknowledge,
+          r.name_it,
+          r.need,
+          r.try_this,
+          r.next_step,
+        ].filter((s) => s && !/^我在这[。！]?$/.test(s.trim()));
+        // v2.0.3 fix: 后端 silent_retry hint 表示已 fallback 3 次以上 → 给用户清晰提示
+        const hint = r.meta?.hint;
+        const isRepeated = hint === 'silent_retry';
+        const content = parts.length > 0
+          ? (isRepeated
+              ? parts.join('\n\n') + '\n\n（我们这会儿没接住，可以稍后再来，或退出也行。）'
+              : parts.join('\n\n'))
+          : '我在听。这件事听起来不容易——你愿意再具体说说吗？';
         setMessages((m) => [
           ...m,
           {
             role: 'assistant',
-            content: [r.acknowledge, r.name_it, r.need, r.try_this, r.next_step]
-              .filter(Boolean)
-              .join('\n\n'),
+            content,
             meta: r,
           },
         ]);
       }
     } catch {
+      // v2.0.2 fix: 网络/服务异常的 fallback 也不再用"我在这"
       setMessages((m) => [
         ...m,
-        { role: 'assistant', content: '我们这会有点忙，再说一次？' },
+        { role: 'assistant', content: '我们这会儿有点忙，再说一次？' },
       ]);
     } finally {
       setLoading(false);
@@ -96,12 +124,6 @@ export default function ConversationPage() {
       </header>
 
       <div ref={scrollerRef} className="flex-1 space-y-4 overflow-y-auto pb-4">
-        {messages.length === 0 && (
-          <div className="rounded-lg bg-primary-soft p-4 text-sm text-neutral-500">
-            <p>我在这。</p>
-            <p className="mt-2">想聊什么都行；不聊也行。</p>
-          </div>
-        )}
         {messages.map((m, i) => (
           <ChatBubble key={i} role={m.role} content={m.content} meta={m.meta} />
         ))}

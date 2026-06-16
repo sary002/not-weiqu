@@ -2,8 +2,13 @@
 
 > **Owner**：Backend（BE）
 > **Reviewer**：A、FE、PE、Q
-> **版本**：v1.0
-> **关联**：`docs/03-System-Architecture.md`、`docs/04-Database-Design.md`、`rules/safety.md`
+> **版本**：v1.1（2026-06-16 增补 v2.0 端点）
+> **关联**：`docs/03-System-Architecture.md`、`docs/04-Database-Design.md`、`docs/02-Prototype.md` v2.0、`rules/safety.md`
+
+> **本版变更**：
+> - 资源模型新增：SkillNode（技能节点）、SkillSection（5 段技能树）、DrillSession（12 步演练）、DrillStep（演练步骤）、Today3（今日三件小事）、GentleStreak（温和连击）、RestDay（休整日）、LowPressureMode（低压力模式）
+> - `/v1/drills` 端点升级为 12 步固定流程（保留 v1.0 形态但 step 字段从 free-form 改为枚举）
+> - 新增 v2.0 拒绝清单的端点级自检项（无 `/v1/hearts` `/v1/gems` `/v1/leaderboard` `/v1/checkin` 端点）
 
 ---
 
@@ -89,18 +94,34 @@
 | 资源 | 路径 | 备注 |
 | --- | --- | --- |
 | Profile | `/v1/profiles/me` | 匿名档案 |
-| Conversation | `/v1/conversations` | 会话 |
+| Conversation | `/v1/conversations` | 会话（v1.0 保留，承载自由对话） |
 | Message | `/v1/conversations/{id}/messages` | 消息 |
 | CrisisEvent | `/v1/crisis-events` | 危机事件（仅写入，由后端记录） |
-| Scenario | `/v1/scenarios` | 场景（只读） |
-| Script | `/v1/scripts` | 用户剧本 |
+| Scenario | `/v1/scenarios` | 场景（只读，兼容 v1.0） |
+| Script | `/v1/scripts` | 用户剧本（v2.0 提升为底部 Tab） |
 | Progress | `/v1/progress` | 进度 |
 | Milestone | `/v1/milestones` | 我做到了 |
 | KnowledgeBlock | `/v1/internal/kb/blocks` | 内部知识块 |
 | DataRequest | `/v1/data-requests` | 导出 / 删除 |
-| DrillSession | `/v1/drills` | 演练 |
-| DrillMessage | `/v1/drills/{id}/messages` | 演练消息 |
+| **SkillSection** | **`/v1/sections`** | **5 段技能树（v2.0 新增）** |
+| **SkillNode** | **`/v1/skills`** | **技能节点（v2.0 新增，6 态）** |
+| **DrillSession** | **`/v1/drills`** | **12 步固定流程演练（v2.0 升级）** |
+| **DrillStep** | **`/v1/drills/{id}/steps/{n}`** | **演练步骤（v2.0 新增）** |
+| **Today3** | **`/v1/today-3`** | **今日三件小事（v2.0 新增）** |
+| **GentleStreak** | **`/v1/gentle-streak`** | **温和连击（v2.0 新增）** |
+| **RestDay** | **`/v1/rest-days`** | **休整日（v2.0 新增，每周 1–2 天）** |
+| **LowPressureMode** | **`/v1/low-pressure-mode`** | **低压力模式（v2.0 新增，默认 ON）** |
 | CrisisResources | `/v1/crisis-resources` | 危机兜底资源（公开只读） |
+
+#### 4.1.1 v2.0 拒绝清单（端点级自检）
+> 自动化测试需验证以下端点**不存在**：
+> - ❌ `/v1/hearts` / `/v1/lives`（心数 / 命数）
+> - ❌ `/v1/gems` / `/v1/coins` / `/v1/shop`（货币 / 商店）
+> - ❌ `/v1/leaderboard` / `/v1/league` / `/v1/rank`（排行榜）
+> - ❌ `/v1/checkin` / `/v1/streak-repair`（打卡 / 付费修复）
+> - ❌ `/v1/countdown` / `/v1/flash-sale`（倒计时 / 限时折扣）
+>
+> 一旦发现，CI 必须失败。
 
 ## 5. 通用约定
 
@@ -279,7 +300,122 @@
 #### DELETE /v1/scripts/{id}
 - 描述：删除
 
-### 9.5 Progress
+### 9.5 技能树（v2.0 新增）
+
+#### GET /v1/sections
+- 描述：5 段技能树列表
+- 响应：`SkillSection[]`（id, layer, name, mastery_count, mastery_total, locked）
+
+#### GET /v1/sections/{id}/skills
+- 描述：某段下的技能节点列表
+- 响应：`SkillNode[]`（id, section_id, title, layer, status[locked|available|in_progress|mastered_basic|mastered_deep|recommended], progress, practiced_count, last_practiced_at, scene_tags）
+
+#### GET /v1/skills/{id}
+- 描述：技能节点详情（含场景卡与 5–7 个演练摘要）
+
+#### GET /v1/skills/today
+- 描述：系统推荐的今日必做技能节点
+
+### 9.6 演练 12 步（v2.0 升级）
+
+#### POST /v1/drills
+- 描述：开启一次 12 步演练
+- 请求：`{ skill_id: uuid }`
+- 响应：`DrillSession`（id, skill_id, current_step: 1, status: "in_progress", started_at）
+
+#### GET /v1/drills/{id}
+- 描述：获取演练当前状态
+- 响应：`DrillSession`（含 current_step, paused_at, draft_step 等）
+
+#### POST /v1/drills/{id}/steps/{n}
+- 描述：提交第 N 步（1–12）
+- 请求：
+  - N=1 INTRO：`{ acknowledged: true }`
+  - N=2 觉察：`{ body_signal: enum }`（紧张/胸闷/胃紧/手心出汗/无明显/其他）
+  - N=3 命名：`{ emotion: string }`
+  - N=4 需求：`{ i_want: string }`
+  - N=5 边界：`{ i_will: string, i_wont: string }`
+  - N=6 开场：`{ opener_id: uuid }`（从 AI 给的 2–3 个开场白选 1）
+  - N=7 演练：`{ user_says: string }`（用户说出口的话）
+  - N=8 应对：`{ counter_id: uuid }`（对方反驳 → 选应对）
+  - N=9 收束：`{ acknowledged: true }`（AI 给 1 句平静话术，用户确认收到）
+  - N=10 演练后：`{ read_acknowledged: bool }`
+  - N=11 保存：`{ save_to_script: bool, custom_content?: string }`
+  - N=12 OUTRO：`{ acknowledged: true }`
+- 响应：`DrillStep`（step_no, ai_response, next_step, is_complete）
+
+#### POST /v1/drills/{id}/pause
+- 描述：暂停演练，保存草稿
+- 副作用：DrillSession.status = "paused", draft_step = current_step
+
+#### POST /v1/drills/{id}/resume
+- 描述：从草稿步继续
+
+#### POST /v1/drills/{id}/abort
+- 描述：放弃本次演练（**不计入进度**）
+
+### 9.7 今日三件小事（v2.0 新增）
+
+#### GET /v1/today-3
+- 描述：今日 1 必做 + 2 选做
+- 响应：
+  ```json
+  {
+    "date": "2026-06-16",
+    "required": { "type": "drill", "skill_id": "...", "estimated_minutes": 3 },
+    "optional_a": { "type": "review", "skill_id": "...", "reason": "low_mastery" },
+    "optional_b": { "type": "knowledge_card" | "custom_scenario", "id": "..." },
+    "completed": [0, 1, 2],  // 已完成索引
+    "low_pressure_mode": true
+  }
+  ```
+
+#### POST /v1/today-3/{slot}/complete
+- 描述：标记某个 slot 已完成
+- 参数：slot ∈ { required, optional_a, optional_b }
+- 副作用：今日进度 +1（最多 3）；不写"未完成"惩罚
+
+### 9.8 温和连击（v2.0 新增）
+
+#### GET /v1/gentle-streak
+- 描述：当前温和连击状态
+- 响应：
+  ```json
+  {
+    "current_days": 3,
+    "longest_days": 17,
+    "practiced_today": true,
+    "rest_days_remaining_this_week": 1,  // 0-2
+    "next_reset_window": "2026-06-17T00:00:00+08:00"
+  }
+  ```
+- **强约束**：
+  - 缺失 1 天 = 静默归零（不发推送、不弹窗）
+  - 周末 0~2 天可标记为休整日
+  - **无任何"修复"端点**
+
+#### POST /v1/rest-days
+- 描述：标记某天为休整日
+- 请求：`{ date: "2026-06-17" }`
+- 约束：每周最多 2 天；只能标记未来 7 天内
+
+#### DELETE /v1/rest-days/{date}
+- 描述：撤销休整日标记
+
+### 9.9 低压力模式（v2.0 新增）
+
+#### GET /v1/low-pressure-mode
+- 描述：当前开关状态
+- 响应：`{ enabled: true, since: "...", push_subscribed: false }`
+
+#### POST /v1/low-pressure-mode
+- 描述：开启 / 关闭低压力模式
+- 请求：`{ enabled: bool, confirmed: bool }`（关闭时 confirmed 必须为 true 走二次确认）
+- 副作用：
+  - 开启时：静默所有推送；静默所有红点；禁用动效
+  - 关闭时：可订阅"今日完成"轻提示（用户主动）
+
+### 9.10 进度（v2.0 升级）
 
 #### GET /v1/progress
 - 描述：进度与里程碑
@@ -292,7 +428,7 @@
 #### POST /v1/progress/disable
 - 描述：关闭进度
 
-### 9.6 Data Request
+### 9.11 Data Request
 
 #### POST /v1/data-requests
 - 描述：创建数据请求
@@ -446,3 +582,13 @@
 - Trace：分布式追踪 ID
 - SSE：Server-Sent Events
 - 兜底话术：模型失败时本地静态返回
+- **微技能（Skill）**：技能树节点，对应 5–7 个演练
+- **演练（Drill）**：12 步固定流程
+- **温和连击（Gentle Streak）**：连续 N 天有"练过"；缺失静默归零
+- **低压力模式（Low Pressure Mode）**：默认 ON；静默所有推送 / 红点 / 动效
+
+### 17.3 v2.0 同步说明
+- v2.0 端点详见 §4.1（资源表）、§9.5–9.11
+- 拒绝清单端点自检详见 §4.1.1
+- v2.0 prototype 调整时，本文件 §4.1 / §9.5–9.11 同步刷新
+- 详细演练步骤枚举详见 `docs/02-Prototype.md` §6.4（12 步骨架）

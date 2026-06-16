@@ -276,16 +276,18 @@ const REPLY_POOLS: Record<Pattern, ReplyTemplate> = {
   },
   危机: { acknowledge: [], name_it: [], need: [], try_this: [], next_step: [] },
   其他: {
-    acknowledge: ['我在这。', '嗯，我听到了。', '你刚才那句话我没太接住。'],
-    name_it: ['想再跟我说说吗？', '可以慢慢来。', '不急。'],
+    // v2.0.2 fix: 不再以"我在这"开头，避免和开场白重复
+    acknowledge: ['听到了。', '嗯。', '这件事我想再听一点。'],
+    name_it: ['听起来不容易。', '能再多说一句吗？', '你说慢一点也行。'],
     need: ['', '', ''],
     try_this: ['', '', ''],
-    next_step: ['想从哪开始都行，或者我们就先随便聊聊。', '可以只说一点点。', '你现在想被听，还是想被回应？'],
+    next_step: ['你愿意从哪一段开始说？', '你现在的感受是什么？', '能跟我说说刚才发生了什么吗？'],
   },
 };
 
 const LATE_TURN_POOLS: ReplyTemplate = {
-  acknowledge: ['嗯。', '听到了。', '我在这。', '好。'],
+  // v2.0.2 fix: acknowledge 不再用"我在这"，避免和开场白重复
+  acknowledge: ['嗯。', '听到了。', '我在听。', '好。'],
   name_it: [
     '你刚才说的那个担心，我记着。',
     '这件事对你来说是真的。',

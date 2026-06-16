@@ -47,7 +47,14 @@
 ```
 
 ## 当前活跃计划
-- （产品设计阶段暂无业务 feature 计划；此文件用于后续登记）
+- `m2-poc.md` — v2.0 形态 M2 PoC（1 微技能 + 12 步演练 + 温和连击 + 低压力 + 危机）
 
 ## 已完成计划
 - （暂无）
+
+## 每日工作日志
+- `daily/README.md` — 每日 standup 规则
+- `daily/2026-06-17.md` — 今日（v2.0.7 token 审计 + bug 修复收尾）
+
+## 重要变更（changelog）
+- 根目录 `CHANGELOG.md` — 按 Keep a Changelog 格式记录

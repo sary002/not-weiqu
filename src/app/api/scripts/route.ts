@@ -4,9 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withTrace, withRateLimit } from '@/lib/api/middleware';
 import { jsonError } from '@/lib/utils/error';
 import { uuid } from '@/lib/utils/id';
-
-// 内存版（生产接 Supabase）
-const scripts: Map<string, unknown> = new Map();
+import { scriptsStore } from '@/lib/scripts-store';
 
 export async function POST(req: NextRequest) {
   const { trace_id } = withTrace(req);
@@ -17,7 +15,7 @@ export async function POST(req: NextRequest) {
     if (!body.title || !body.content) return jsonError('NW-ST-0001', trace_id);
     const id = uuid();
     const item = { id, ...body, created_at: new Date().toISOString() };
-    scripts.set(id, item);
+    scriptsStore.set(id, item);
     return NextResponse.json(
       { data: item, meta: { trace_id, server_time: new Date().toISOString() } },
       { status: 201 },
@@ -32,7 +30,7 @@ export async function GET(req: NextRequest) {
   const rl = withRateLimit('scripts:list', 60, 60_000);
   if (!rl.ok) return rl.response;
   return NextResponse.json({
-    data: Array.from(scripts.values()),
+    data: Array.from(scriptsStore.values()),
     meta: { trace_id, server_time: new Date().toISOString() },
   });
 }
