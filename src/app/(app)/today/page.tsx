@@ -1,8 +1,9 @@
 // src/app/(app)/today/page.tsx
-// v2.0.7.2 (ADR-003 + 多邻国化) 边界成长路 · 流程化布局
-// 来自 docs/decisions/adr-003-ui-visual-language-v2.md + 多邻国风格参考
-// 设计：5 段分组，每段内节点圆形按钮横向排列（路径式）
+// v2.0.7.3 (ADR-003 + 完全多邻国化) 边界成长路 · 关卡地图
+// 来自 docs/decisions/adr-003-ui-visual-language-v2.md + 多邻国关卡地图参考
+// 设计：5 段分组，节点左右偏移（之字形），S 形 SVG 曲线连接
 import Link from 'next/link';
+import { Fragment } from 'react';
 import { SkillNode, type SkillStatus } from '@/components/skilltree/SkillNode';
 
 interface SkillSeed {
@@ -19,6 +20,44 @@ interface SectionSeed {
   layer: 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
   name: string;
   skills: SkillSeed[];
+}
+
+/**
+ * S 形 SVG 连接器（在两个节点之间画 S 形曲线）
+ * 方向根据 fromSide / toSide 决定（left / right）
+ */
+function ZigzagConnector({
+  fromSide,
+  toSide,
+}: {
+  fromSide: 'left' | 'right';
+  toSide: 'left' | 'right';
+}) {
+  // SVG viewBox: 80 × 60
+  // 起点 (x=10, y=0) → 终点 (x=70, y=60) 或反之
+  // 用 cubic bezier 画 S 形
+  const startX = fromSide === 'left' ? 10 : 70;
+  const endX = toSide === 'left' ? 10 : 70;
+  const path = `M ${startX} 0 C ${startX === 10 ? 70 : 10} 20, ${endX === 10 ? 70 : 10} 40, ${endX} 60`;
+
+  return (
+    <div className="my-[-12px] flex h-12 w-32 items-center justify-center" aria-hidden>
+      <svg
+        viewBox="0 0 80 60"
+        className="h-full w-full"
+        preserveAspectRatio="none"
+      >
+        <path
+          d={path}
+          stroke="#C9D9B7"
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray="4 4"
+        />
+      </svg>
+    </div>
+  );
 }
 
 export default function TodayPage() {
@@ -69,7 +108,7 @@ export default function TodayPage() {
   const gentleStreak = { days: 3, restDaysLeftThisWeek: 1 };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10 px-4 py-6">
+    <div className="mx-auto max-w-md space-y-10 px-4 py-8">
       {/* 顶部状态条 */}
       <header className="text-center">
         <h1 className="font-serif text-2xl font-semibold text-warm-900">今日</h1>
@@ -78,35 +117,48 @@ export default function TodayPage() {
         </p>
       </header>
 
-      {/* 流程化路径：5 段分组，每段内节点圆形按钮横向排列 */}
+      {/* 流程化路径：5 段分组，每段内节点左右偏移（之字形）+ S 形曲线连接 */}
       <section>
-        <h2 className="mb-6 text-center font-serif text-sm font-medium text-sage-700">
+        <h2 className="mb-8 text-center font-serif text-sm font-medium text-sage-700">
           边界成长路
         </h2>
         <ol className="space-y-12">
           {sections.map((s, idx) => (
             <li key={s.id}>
               {/* 段标题 */}
-              <div className="mb-4 flex items-center justify-center gap-2">
+              <div className="mb-6 flex items-center justify-center gap-2">
                 <span className="font-mono text-xs text-sage-600/60">§{idx + 1}</span>
                 <span className="font-serif text-base font-medium text-warm-900">
                   {s.name}
                 </span>
                 <span className="text-xs text-sage-600/60">· {s.layer}</span>
               </div>
-              {/* 段内节点：圆形按钮横向排列（路径式） */}
-              <ul className="flex flex-wrap items-start justify-center gap-6">
-                {s.skills.map((sk) => (
-                  <li key={sk.id}>
-                    <SkillNode
-                      title={sk.title}
-                      code={sk.code}
-                      practiced={sk.practiced}
-                      status={sk.status}
-                      draftStep={sk.draftStep}
-                    />
-                  </li>
-                ))}
+              {/* 段内节点：左右偏移 + S 形曲线连接 */}
+              <ul className="flex flex-col items-center">
+                {s.skills.map((sk, i) => {
+                  const side: 'left' | 'right' = i % 2 === 0 ? 'left' : 'right';
+                  const nextSide: 'left' | 'right' = (i + 1) % 2 === 0 ? 'left' : 'right';
+                  return (
+                    <Fragment key={sk.id}>
+                      <li
+                        className={side === 'left' ? 'self-start ml-2' : 'self-end mr-2'}
+                      >
+                        <SkillNode
+                          title={sk.title}
+                          code={sk.code}
+                          practiced={sk.practiced}
+                          status={sk.status}
+                          draftStep={sk.draftStep}
+                        />
+                      </li>
+                      {i < s.skills.length - 1 && (
+                        <li aria-hidden>
+                          <ZigzagConnector fromSide={side} toSide={nextSide} />
+                        </li>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </ul>
             </li>
           ))}
