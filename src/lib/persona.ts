@@ -49,6 +49,16 @@ export const PERSONAS: Record<PersonaId, Persona> = {
   },
 };
 
+// ============ Type guards（API 参数校验用）============
+
+export function isPersonaId(v: unknown): v is PersonaId {
+  return typeof v === 'string' && v in PERSONAS;
+}
+
+export function isMoodId(v: unknown): v is MoodId {
+  return v === 'low' || v === 'normal' || v === 'good' || v === 'calm';
+}
+
 export const DEFAULT_PERSONA: PersonaId = 'wen';
 
 export const PERSONA_LIST: Persona[] = Object.values(PERSONAS);
