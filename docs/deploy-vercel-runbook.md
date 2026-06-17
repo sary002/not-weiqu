@@ -33,6 +33,7 @@
 | `.nvmrc` | ✅ Node 20 LTS | Vercel 自动识别 |
 | `vercel.json` | ✅ 已就绪 | 显式 Node + 函数 30s + hnd1/sin1 region + 安全头 |
 | `.eslintrc.json` | ✅ 已就绪 | `next/core-web-vitals` + `next/typescript` |
+| `.npmrc` | ✅ `legacy-peer-deps=true` | 解决 Vercel `npm ci` ERESOLVE（React 19 RC） |
 
 ---
 
