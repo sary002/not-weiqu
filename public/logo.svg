@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" fill="none" role="img" aria-label="不委屈 Logo - 圆润仙人掌">
+  <title>不委屈 Logo</title>
+  <desc>圆润仙人掌，柱身为鼠尾草绿，顶部一颗仙人掌果</desc>
+
+  <!-- 主体柱身：圆角矩形（圆角 = 柱宽 25%） -->
+  <rect x="33" y="22" width="34" height="84" rx="14" ry="14" fill="#9CAF88" />
+
+  <!-- 顶部红果：仙人掌花 -->
+  <circle cx="50" cy="18" r="8" fill="#D67D6A" />
+
+  <!-- 高光（柱身左侧） -->
+  <rect x="38" y="30" width="4" height="60" rx="2" ry="2" fill="#B7C9A3" opacity="0.5" />
+
+  <!-- 浅色刺点（极小，不锐利） -->
+  <circle cx="50" cy="48" r="1.4" fill="#7E9863" opacity="0.55" />
+  <circle cx="50" cy="62" r="1.4" fill="#7E9863" opacity="0.55" />
+  <circle cx="50" cy="76" r="1.4" fill="#7E9863" opacity="0.55" />
+  <circle cx="50" cy="90" r="1.4" fill="#7E9863" opacity="0.55" />
+</svg>

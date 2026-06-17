@@ -4,27 +4,71 @@
 
 @layer base {
   :root {
-    /* 来自 docs/02-Prototype.md §3.1 */
-    --background: 39 30% 97%;        /* #FAFAF7 */
-    --foreground: 220 13% 14%;       /* #1F2328 */
+    /* ADR-003 UI 视觉语言 v2 · 鼠尾草绿 + 暖中性 */
+    /* 鼠尾草绿 Sage Green · 10 阶 */
+    --sage-50:  86 33% 95%;   /* #F4F7F0 */
+    --sage-100: 85 38% 88%;   /* #E5EDDB */
+    --sage-200: 86 38% 78%;   /* #C9D9B7 */
+    --sage-300: 84 26% 66%;   /* #A8C190 */
+    --sage-400: 88 21% 58%;   /* #9CAF88 · 主品牌色 */
+    --sage-500: 92 24% 44%;   /* #7E9863 */
+    --sage-600: 95 27% 36%;   /* #637A4D */
+    --sage-700: 94 26% 29%;   /* #4A5C39 */
+    --sage-800: 94 25% 22%;   /* #34422A */
+    --sage-900: 86 28% 13%;   /* #1F2818 */
+
+    /* 暖中性 Warm Neutral */
+    --warm-50:  36 36% 97%;   /* #FAF7F2 · 全局背景 */
+    --warm-100: 35 35% 92%;   /* #F2EBE0 */
+    --warm-200: 35 36% 84%;   /* #E5DCC9 */
+    --warm-700: 30 27% 28%;   /* #5A4A36 · 主要文字 */
+    --warm-900: 28 28% 13%;   /* #2A2118 */
+
+    /* 点缀色 */
+    --cactus-flower: 13 53% 64%;   /* #D67D6A · 仙人掌果 */
+    --sunset: 28 65% 70%;          /* #E8B47C */
+    --clay: 22 38% 48%;            /* #A8704D */
+
+    /* 人格色板（ADR-005 灵魂设计） */
+    --persona-wen: 0 60% 88%;      /* #FAD0D0 温姐暖粉 */
+    --persona-zhi: 218 28% 78%;    /* #B8C5D6 智哥雾蓝 */
+    --persona-song: 45 90% 84%;    /* #FFE9A8 松松浅黄 */
+
+    /* 主语义变量（基于 sage） */
+    --background: var(--warm-50);
+    --foreground: var(--warm-700);
     --surface: 0 0% 100%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%; /* #6B7280 */
-
-    --primary: 233 100% 65%;        /* #4F5BFF */
+    --muted: var(--sage-50);
+    --muted-foreground: var(--sage-700);
+    --primary: var(--sage-400);
     --primary-foreground: 0 0% 100%;
-    --primary-soft: 233 100% 96%;   /* #EEF0FF */
+    --primary-soft: var(--sage-50);
 
-    --neutral-900: 220 13% 14%;
-    --neutral-500: 220 9% 46%;
+    --neutral-900: var(--warm-900);
+    --neutral-500: var(--sage-700);
 
-    --success: 142 71% 36%;         /* #1F9D55 */
-    --warning: 26 87% 38%;          /* #B45309 */
-    --danger: 0 74% 42%;            /* #B91C1C */
+    --success: 142 32% 42%;        /* #4F9966（弱化） */
+    --warning: 30 50% 50%;         /* #B5894F（弱化） */
+    --danger: 14 40% 50%;          /* #B5674F · 陶土红，不用纯红 */
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 233 100% 65%;
+    --border: var(--sage-200);
+    --input: var(--sage-200);
+    --ring: var(--sage-400);
+  }
+
+  /* 暗色模式：深夜陪伴（不变品牌色） */
+  .dark {
+    --background: var(--sage-900);
+    --foreground: var(--warm-100);
+    --surface: var(--sage-800);
+    --muted: var(--sage-800);
+    --muted-foreground: var(--sage-200);
+    --primary: var(--sage-300);
+    --primary-foreground: var(--sage-900);
+    --primary-soft: var(--sage-800);
+    --border: var(--sage-700);
+    --input: var(--sage-700);
+    --ring: var(--sage-300);
   }
 
   * {
@@ -34,6 +78,15 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+    /* 字体：思源黑体（无衬线，可读性优先）+ 系统中文 fallback */
+    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC',
+      'Microsoft YaHei', system-ui, sans-serif;
+  }
+
+  /* 标题用衬线（温度感） */
+  h1, h2, h3, .font-serif {
+    font-family: 'Source Han Serif SC', 'Songti SC', 'STSong',
+      'SimSun', Georgia, serif;
   }
 
   /* 减弱动效偏好 */
@@ -47,6 +100,28 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/* 呼吸感微动效（ADR-003 §4） */
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.animate-breathe {
+  animation: breathe 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-breathe {
+    animation: none !important;
+  }
+}
+
+/* Logo 加载动画 */
+.logo-loader {
+  animation: breathe 2s ease-in-out infinite;
+  transform-origin: center;
 }
 
 @layer utilities {
