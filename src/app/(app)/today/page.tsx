@@ -41,7 +41,7 @@ function ZigzagConnector({
   const path = `M ${startX} 0 C ${startX === 10 ? 70 : 10} 20, ${endX === 10 ? 70 : 10} 40, ${endX} 60`;
 
   return (
-    <div className="my-[-12px] flex h-12 w-32 items-center justify-center" aria-hidden>
+    <div className="flex h-10 w-24 items-center justify-center" aria-hidden>
       <svg
         viewBox="0 0 80 60"
         className="h-full w-full"
@@ -122,26 +122,26 @@ export default function TodayPage() {
         <h2 className="mb-8 text-center font-serif text-sm font-medium text-sage-700">
           边界成长路
         </h2>
-        <ol className="space-y-12">
+        <ol className="space-y-10">
           {sections.map((s, idx) => (
             <li key={s.id}>
               {/* 段标题 */}
-              <div className="mb-6 flex items-center justify-center gap-2">
+              <div className="mb-4 flex items-center justify-center gap-2">
                 <span className="font-mono text-xs text-sage-600/60">§{idx + 1}</span>
                 <span className="font-serif text-base font-medium text-warm-900">
                   {s.name}
                 </span>
                 <span className="text-xs text-sage-600/60">· {s.layer}</span>
               </div>
-              {/* 段内节点：左右偏移 + S 形曲线连接 */}
-              <ul className="flex flex-col items-center">
+              {/* 段内节点：紧凑左右偏移 + S 形曲线连接（容器宽度自适应内容） */}
+              <ul className="mx-auto flex flex-col items-stretch w-48">
                 {s.skills.map((sk, i) => {
                   const side: 'left' | 'right' = i % 2 === 0 ? 'left' : 'right';
                   const nextSide: 'left' | 'right' = (i + 1) % 2 === 0 ? 'left' : 'right';
                   return (
                     <Fragment key={sk.id}>
                       <li
-                        className={side === 'left' ? 'self-start ml-2' : 'self-end mr-2'}
+                        className={side === 'left' ? 'self-start' : 'self-end'}
                       >
                         <SkillNode
                           title={sk.title}
@@ -152,7 +152,7 @@ export default function TodayPage() {
                         />
                       </li>
                       {i < s.skills.length - 1 && (
-                        <li aria-hidden>
+                        <li aria-hidden className="-my-2 self-center">
                           <ZigzagConnector fromSide={side} toSide={nextSide} />
                         </li>
                       )}
