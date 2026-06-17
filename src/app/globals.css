@@ -29,6 +29,11 @@
     --sunset: 28 65% 70%;          /* #E8B47C */
     --clay: 22 38% 48%;            /* #A8704D */
 
+    /* 人格色板（ADR-005 灵魂设计） */
+    --persona-wen: 0 60% 88%;      /* #FAD0D0 温姐暖粉 */
+    --persona-zhi: 218 28% 78%;    /* #B8C5D6 智哥雾蓝 */
+    --persona-song: 45 90% 84%;    /* #FFE9A8 松松浅黄 */
+
     /* 主语义变量（基于 sage） */
     --background: var(--warm-50);
     --foreground: var(--warm-700);

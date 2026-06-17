@@ -62,6 +62,11 @@ const config: Config = {
           sunset:  'hsl(var(--sunset))',
           clay:    'hsl(var(--clay))',
         },
+        persona: {
+          wen:  'hsl(var(--persona-wen))',     // 温姐暖粉
+          zhi:  'hsl(var(--persona-zhi))',     // 智哥雾蓝
+          song: 'hsl(var(--persona-song))',    // 松松浅黄
+        },
       },
       borderRadius: {
         sm: '4px',

@@ -1,10 +1,11 @@
 // src/app/(app)/settings/page.tsx
-// v2.0.6 设置：低压力模式（默认 ON）+ 今日投入 + 数据 + 通知 + 动效 + 关于
-// v2.0.6 fix: localStorage 持久化（之前刷新页面设置全丢）
+// v2.0.7.5 (ADR-005 灵魂设计 v2) 设置：低压力模式 + 我的人格 + 今日投入 + 数据 + 动效 + 关于
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Shield, ArrowLeft } from 'lucide-react';
+import { PersonaSelector } from '@/components/soul/PersonaSelector';
+import { loadPersonaPref, savePersonaPref, type PersonaId } from '@/lib/persona';
 
 const LS_KEY = 'nw-settings-v1';
 
@@ -39,6 +40,8 @@ export default function SettingsPage() {
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  // v2.0.7.5 (ADR-005) 人格偏好
+  const [persona, setPersona] = useState<PersonaId>('wen');
 
   // v2.0.6 fix: 客户端 hydrate 后从 localStorage 读取
   useEffect(() => {
@@ -46,8 +49,15 @@ export default function SettingsPage() {
     setLowPressureState(s.lowPressure);
     setPushState(s.push);
     setTodayLevelState(s.todayLevel);
+    setPersona(loadPersonaPref());
     setHydrated(true);
   }, []);
+
+  // 切换人格（ADR-005：无需二次确认）
+  const handlePersonaChange = (id: PersonaId) => {
+    setPersona(id);
+    savePersonaPref(id);
+  };
 
   // 写 localStorage（仅在 hydrated 之后，避免 SSR 误写）
   const persist = (patch: Partial<PersistedSettings>) => {
@@ -158,6 +168,15 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+      </section>
+
+      {/* v2.0.7.5 (ADR-005) 我的人格 */}
+      <section className="rounded-xl border border-sage-200 bg-warm-50 p-5">
+        <h2 className="mb-1 text-sm font-medium text-warm-900">我的人格</h2>
+        <p className="mb-3 text-xs text-sage-700/70">
+          陪你练习的 AI 教练。可以随时换，不打断练习。
+        </p>
+        <PersonaSelector current={persona} onChange={handlePersonaChange} />
       </section>
 
       {/* 今日投入：轻 / 稳 / 深入 */}

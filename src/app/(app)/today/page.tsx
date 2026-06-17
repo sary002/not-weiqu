@@ -1,7 +1,8 @@
 // src/app/(app)/today/page.tsx
-// v2.0.7.4 (ADR-003 + 完全多邻国化 + 语义化图标) 边界成长路 · 关卡地图
-// 来自 docs/decisions/adr-003-ui-visual-language-v2.md + 多邻国关卡地图参考
-// 设计：5 段分组，节点左右偏移（之字形），S 形 SVG 曲线连接，圆内语义化图标
+// v2.0.7.5 (ADR-005 灵魂设计 v2) 边界成长路 · 关卡地图 + 情境卡
+// 来自 docs/decisions/adr-005-soul-design-v2.md §P0
+'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Fragment } from 'react';
 import {
@@ -15,6 +16,8 @@ import {
   Home,
 } from 'lucide-react';
 import { SkillNode, type SkillStatus } from '@/components/skilltree/SkillNode';
+import { MoodCheckin } from '@/components/soul/MoodCheckin';
+import { shouldShowMoodCheckin, markMoodCheckinShown, type MoodId } from '@/lib/persona';
 
 interface SkillSeed {
   id: string;
@@ -71,6 +74,20 @@ function ZigzagConnector({
 }
 
 export default function TodayPage() {
+  // v2.0.7.5 (ADR-005) 情境卡状态
+  const [showMood, setShowMood] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  // 客户端 hydrate 后检查是否弹情境卡
+  useEffect(() => {
+    setHydrated(true);
+    if (shouldShowMoodCheckin()) {
+      setShowMood(true);
+    } else {
+      markMoodCheckinShown(); // 标记今天已处理
+    }
+  }, []);
+
   // 5 段技能树骨架 + 语义化图标映射
   const iconMap: Record<string, React.ReactNode> = {
     'l1-body-awareness': <Activity />,      // 听见身体的信号 → 心电图
@@ -130,6 +147,17 @@ export default function TodayPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-10 px-4 py-8">
+      {/* v2.0.7.5 (ADR-005) 情境卡（首次进入 / 7 天后弹一次） */}
+      {hydrated && showMood && (
+        <MoodCheckin
+          onComplete={() => setShowMood(false)}
+          onSkip={() => {
+            markMoodCheckinShown();
+            setShowMood(false);
+          }}
+        />
+      )}
+
       {/* 顶部状态条 */}
       <header className="text-center">
         <h1 className="font-serif text-2xl font-semibold text-warm-900">今日</h1>
