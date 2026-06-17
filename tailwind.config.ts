@@ -13,7 +13,7 @@ const config: Config = {
     },
     extend: {
       colors: {
-        // 来自 docs/02-Prototype.md §3.1 视觉语言
+        // 来自 ADR-003 UI 视觉语言 v2 · 鼠尾草绿 + 暖中性
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         surface: 'hsl(var(--surface))',
@@ -36,15 +36,44 @@ const config: Config = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
+
+        // ADR-003 扩展色板
+        sage: {
+          50:  'hsl(var(--sage-50))',
+          100: 'hsl(var(--sage-100))',
+          200: 'hsl(var(--sage-200))',
+          300: 'hsl(var(--sage-300))',
+          400: 'hsl(var(--sage-400))',  // ★ 主品牌色
+          500: 'hsl(var(--sage-500))',
+          600: 'hsl(var(--sage-600))',
+          700: 'hsl(var(--sage-700))',
+          800: 'hsl(var(--sage-800))',
+          900: 'hsl(var(--sage-900))',
+        },
+        warm: {
+          50:  'hsl(var(--warm-50))',
+          100: 'hsl(var(--warm-100))',
+          200: 'hsl(var(--warm-200))',
+          700: 'hsl(var(--warm-700))',
+          900: 'hsl(var(--warm-900))',
+        },
+        cactus: {
+          flower: 'hsl(var(--cactus-flower))',  // 仙人掌果
+          sunset:  'hsl(var(--sunset))',
+          clay:    'hsl(var(--clay))',
+        },
       },
       borderRadius: {
-        lg: '12px',
-        md: '8px',
         sm: '4px',
+        md: '8px',
+        lg: '12px',
         xl: '16px',
+        '2xl': '24px',
+        full: '9999px',
       },
       fontFamily: {
-        sans: ['PingFang SC', 'Hiragino Sans GB', 'system-ui', 'sans-serif'],
+        sans: ['PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'system-ui', 'sans-serif'],
+        serif: ['Source Han Serif SC', 'Songti SC', 'STSong', 'Georgia', 'serif'],
         mono: ['JetBrains Mono', 'Menlo', 'monospace'],
       },
       fontSize: {
