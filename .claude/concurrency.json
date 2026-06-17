@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "createdAt": "2026-06-17",
+  "owner": "Coordinator",
+  "description": "多 Agent 并发执行的开关配置。详见 rules/workflow.md §W-7。",
+
+  "mode": "off",
+
+  "modes": {
+    "off": {
+      "description": "完全串行执行，单 Agent 独自完成所有角色工作。",
+      "useCase": "token 预算紧张 / 小任务 / 个人调试",
+      "behavior": "禁止使用 Workflow 工具；禁止同 prompt 触发 ≥ 2 个 sub-agent"
+    },
+    "on": {
+      "description": "强制多 Agent 并行，跨 ≥ 2 Agent 角色时自动 fan out。",
+      "useCase": "大型任务 / 显式 ultracode / 团队 sprint",
+      "behavior": "C 必须用 parallel / pipeline / Workflow 工具做编排"
+    },
+    "auto": {
+      "description": "按阈值自动判断：满足条件才并行，否则串行。",
+      "useCase": "默认推荐模式（当 token 预算允许时）",
+      "behavior": "C 按 auto 阈值三问评估后再决定"
+    }
+  },
+
+  "triggers": {
+    "ultracode": "on",
+    "ultracode on": "on",
+    "ultracode off": "off",
+    "ultracode auto": "auto",
+    "fan out": "on",
+    "parallel": "on",
+    "多 agent 并行": "on",
+    "一个人做": "off",
+    "省 token": "off"
+  },
+
+  "limits": {
+    "maxSubAgents": 5,
+    "maxTokensPerSubAgent": 80000,
+    "maxTotalTokensMultiplier": 2.0
+  },
+
+  "auto": {
+    "minAgents": 3,
+    "minWallClockGain": 3.0,
+    "questions": [
+      "产出物是否独立？独立则可并行；否则串行",
+      "数据依赖方向？A → B 强依赖则 A 先做；无依赖则并行",
+      "总 token 增量是否 < 2× 单 Agent？是则并行；否则串行或拆分批次"
+    ]
+  },
+
+  "fallback": {
+    "onFailure": "serial",
+    "onBudgetExceeded": "serial",
+    "reportTo": "plans/daily/<YYYY-MM-DD>.md"
+  },
+
+  "override": {
+    "configPath": ".claude/concurrency.local.json",
+    "note": "个人本地覆盖，gitignored，优先级高于本文件。"
+  },
+
+  "history": [
+    {
+      "date": "2026-06-17",
+      "version": "1.0.0",
+      "change": "初始版本，默认 off，由 HTML 注释方案重构为开关方案"
+    },
+    {
+      "date": "2026-06-17",
+      "version": "1.0.1",
+      "change": "off → on：启动 Group A/B/C/D/E 13 个 sub-agent 产出 13 份设计稿；累计 token ~1.17M"
+    },
+    {
+      "date": "2026-06-17",
+      "version": "1.0.2",
+      "change": "on → off：达到 token 预算上限，主动切回"
+    }
+  ]
+}

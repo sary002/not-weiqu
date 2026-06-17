@@ -44,6 +44,27 @@
 
 ## 3. 目录结构（角色 + 关键文件）
 
+### `docs/design/`（M2 PoC 设计稿 · 2026-06-17+）
+
+| 路径 | 角色 |
+| --- | --- |
+| `docs/design/README.md` | 13 份设计稿索引 + 17 任务全景 + 依赖图 |
+| `docs/design/T-XX-<topic>.md` | 各 Task 设计稿（调研 + 设计，不改 src/） |
+| `agents/prompt-engineer/drafts/L<N>-*.md` | PE 场景内容草稿 |
+
+### `docs/decisions/`（ADR 架构决策记录）
+
+| 路径 | 角色 |
+| --- | --- |
+| `docs/decisions/adr-template.md` | ADR 模板 |
+| `docs/decisions/adr-NNN-<topic>.md` | 已决策的 ADR（一旦 Accepted 不修改） |
+
+### `.claude/`（Claude Code 工具配置 + 项目治理）
+
+| 路径 | 角色 |
+| --- | --- |
+| `.claude/concurrency.json` | **多 Agent 并发开关**（mode: off/on/auto + limits + triggers） |
+
 ### `src/`（应用代码）
 
 | 路径 | 角色 | 关键文件 |

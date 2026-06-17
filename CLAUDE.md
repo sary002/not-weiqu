@@ -90,6 +90,21 @@
 | **L2** 方案级 | 影响模块设计 | PM + A + PE/KE 联合 | `plans/` |
 | **L3** 战略级 | 影响产品定位 / 安全 / 合规 | 全员评审 | `docs/decisions/ADR` |
 
+### 2.4 多 Agent 并发开关（默认 off）
+
+> **当前模式**：`off`（详见 `.claude/concurrency.json`）
+> **完整规则**：`rules/workflow.md` §W-7（开关模式）
+> **三种模式**：
+>   - `off`（默认）— 串行执行，禁止多 sub-agent
+>   - `on` — 强制并行，跨 ≥ 2 Agent 角色时自动 fan out
+>   - `auto` — 按阈值自动判断（详见 §W-7.4 三问）
+>
+> **会话级切换**（无需改配置）：
+>   - 开启：`ultracode` / `fan out` / `多 agent 并行`
+>   - 关闭：`ultracode off` / `一个人做` / `省 token`
+>
+> **团队级切换**：修改 `.claude/concurrency.json` 的 `mode` 字段（需先写 ADR）
+
 ---
 
 ## 3. 标准工作流（Standard Workflow）

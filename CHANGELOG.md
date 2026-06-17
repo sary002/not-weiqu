@@ -54,6 +54,41 @@
 
 ---
 
+## [2026-06-17] · M2 PoC 设计阶段启动 + 治理开关化
+
+### Added
+- **多 Agent 并发开关**（v1.0）：
+  - `.claude/concurrency.json` — 配置 mode（`off`/`on`/`auto`）+ limits + auto 阈值 + fallback
+  - `rules/workflow.md §W-7` — 完整规则（始终可见，按开关决定行为）
+  - `CLAUDE.md §2.4` — 治理层索引
+  - **触发词**：`ultracode` / `fan out` / `多 agent 并行` / `ultracode off` / `一个人做` / `省 token`
+- **M2 PoC 设计稿 × 13**：`docs/design/T-01 ~ T-14` + `agents/prompt-engineer/drafts/L3-01-*.md`
+  - 总计 ~10,500 行；详见 `docs/design/README.md`
+  - 13/17 任务有设计稿（76%）
+- **ADR × 2**：
+  - [ADR-001](docs/decisions/adr-001-m2-deploy-vercel.md) M2 PoC 部署形态选 Vercel 托管
+  - [ADR-002](docs/decisions/adr-002-emergency-contacts-storage.md) 紧急联系人存储分阶段策略（M2 localStorage / M3 Supabase）
+- **M2 PoC 设计索引**：`docs/design/README.md`（17 任务全景 + 依赖图 + 阅读建议 + follow-up 汇总）
+
+### Changed
+- 治理规则：`rules/workflow.md` §W-7 由「HTML 注释屏蔽」重构为「开关模式」（用户提议，正解）
+- CLAUDE.md §2.4 默认并发度：DISABLED → off（开关默认状态）
+
+### Security
+- ADR-001 解除 `.env.local` P0 key 泄露风险（核心 server key 迁 Vercel Env）
+- ADR-002 紧急联系人 M2 阶段 100% 本地存储（零后端泄露面）
+- 危机路径（`docs/design/T-09-crisis-fallback.md`）：L0 规则层前移 + 0 LLM 调用 + 跨页面 4 入口一致
+- 温和连击（`docs/design/T-07-gentle-streak.md`）：静默归零 + 不显示"失去 N 天"
+
+### Metrics
+- **5 批 sub-agent 并行**：A (3) + B (2) + C (3) + D (2) + E (3) = **13 个 sub-agent**
+- **wall-clock 节省**：~76%（串行 1,668s → 并行 396s）
+- **sub-agent token 累计**：~1,017K
+- **本会话总 token**：~1.2M（用户原始约束 ~3×，主动切回 off）
+- **设计稿覆盖**：M2 PoC 17 任务中 13 个有设计稿（76%）
+
+---
+
 ## 模板（下次添加时复制）
 
 ```markdown

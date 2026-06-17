@@ -120,6 +120,9 @@
 | **v2.0 prompt 同步未做** | **P0** | **新增** | PE 在 M1-09 集中重写 4 套 prompt |
 | **v2.0 前端 IA 重构未做** | **P0** | **新增** | FE 在 M1-09 重构为 4 Tab + 技能树 + 12 步演练 |
 | **v2.0 数据库 schema 变更** | **P0** | **新增** | BE 增补 skill_node / today3 / gentle_streak / rest_day 表 |
+| **多 Agent 串行执行（冒名顶替）** | **P2** | **新规·开关化** | `rules/workflow.md §W-7` + `CLAUDE.md §2.4` + `.claude/concurrency.json`（mode=off 默认）已就绪；用户可通过会话级关键词（ultracode / fan out）实时切换，无需修改配置 |
+| **`.env.local` 明文 key 散落** | ~~P0~~ → **P1** | **ADR-001 已部分缓解** | Vercel Env 三层（dev/preview/production）迁移 + 离职时一键 regenerate；本地 `.env.local` 降级为 dev 占位（[ADR-001](../docs/decisions/adr-001-m2-deploy-vercel.md) §7） |
+| **紧急联系人 PII（name + phone）** | **P1** | **ADR-002 已缓解** | M2 localStorage 零后端泄露；M3 末迁 Supabase `profiles.emergency_contacts` JSONB（[ADR-002](../docs/decisions/adr-002-emergency-contacts-storage.md) §后果） |
 
 ---
 
@@ -155,6 +158,70 @@
 
 ---
 
+## 🚀 M2 PoC 启动（2026-06-17）— 设计阶段
+
+### 总体进度
+
+| 项 | 值 |
+| --- | --- |
+| 阶段 | M1 完成 ✅ → M2 PoC 设计阶段进行中 |
+| 设计稿 | **13/17 任务**有设计稿（76%） |
+| ADR | 2 份（Proposed，待评审） |
+| 剩余任务 | T-05 / T-15 / T-16 / T-17（串行依赖链） |
+
+### 任务状态
+
+| Task ID | 任务 | Owner | 状态 | 设计稿 |
+| --- | --- | --- | --- | --- |
+| T-01 | 技能树主页 | FE | 🟡 设计稿完成 | [T-01-skill-tree-home.md](../docs/design/T-01-skill-tree-home.md)（668 行） |
+| T-02 | L3-01 场景卡 + 12 步 | PE+KE | 🟡 PE 草稿 + 5 个 KE 问题 | [L3-01-refuse-coworker.md](../agents/prompt-engineer/drafts/L3-01-refuse-coworker.md) |
+| T-03 | 12 步前端 | FE | 🟡 设计稿完成 | [T-03-drill-frontend.md](../docs/design/T-03-drill-frontend.md)（965 行） |
+| T-04 | 12 步后端 + 状态机 | BE | 🟡 设计稿完成 | [T-04-drill-backend.md](../docs/design/T-04-drill-backend.md) |
+| T-05 | AI 编排适配 12 步 | PE+A+BE | ⏸️ 等 T-02 v0.2 | — |
+| T-06 | 今日三件小事 | FE+BE | 🟡 设计稿完成 | [T-06-today-three.md](../docs/design/T-06-today-three.md)（1,493 行） |
+| T-07 | 温和连击 + 休整日 | FE+BE | 🟡 设计稿完成 | [T-07-gentle-streak.md](../docs/design/T-07-gentle-streak.md)（1,281 行） |
+| T-08 | 低压力模式 LPM | FE+BE | 🟡 设计稿完成 | [T-08-low-pressure.md](../docs/design/T-08-low-pressure.md) |
+| T-09 | 危机兜底独立验证 | PE+FE+BE | 🟡 设计稿完成（P0 安全） | [T-09-crisis-fallback.md](../docs/design/T-09-crisis-fallback.md)（925 行） |
+| T-10 | 自由对话 | FE+BE | 🟡 设计稿完成 | [T-10-free-dialogue.md](../docs/design/T-10-free-dialogue.md) |
+| T-11 | 我的剧本 | FE+BE | 🟡 设计稿完成 | [T-11-scripts-tab.md](../docs/design/T-11-scripts-tab.md)（1,100 行） |
+| T-12 | 我 → 进度 | FE+BE | 🟡 设计稿完成 | [T-12-progress-page.md](../docs/design/T-12-progress-page.md)（1,378 行，含 9 条 T-07 待修订） |
+| T-13 | 数据导出 / 删除 | BE | 🟡 设计稿完成 | [T-13-data-export-delete.md](../docs/design/T-13-data-export-delete.md)（348 行） |
+| T-14 | 部署流水线 v1 | A+BE | 🟢 **L2 决策已被 ADR-001 覆盖** | [T-14-deploy-pipeline.md](../docs/design/T-14-deploy-pipeline.md)（531 行） |
+| T-15 | 评测集 v0.5 | PE | ⏸️ 等 T-05 | — |
+| T-16 | 红线用例 + 拒绝清单自检 | Q | ⏸️ 等 T-15 | — |
+| T-17 | 端到端 ≥ 5 真实用户试用 | PM+Q | ⏸️ 等 T-16 | — |
+
+### ADR 决策记录
+
+| ADR | 标题 | 状态 | 影响 |
+| --- | --- | --- | --- |
+| [ADR-001](../docs/decisions/adr-001-m2-deploy-vercel.md) | M2 PoC 部署形态选 Vercel 托管 | Proposed | 解除 P0 `.env.local` key 泄露 + 危机路径不依赖 runtime + T-14 实施 checklist 8 项 |
+| [ADR-002](../docs/decisions/adr-002-emergency-contacts-storage.md) | 紧急联系人存储分阶段策略 | Proposed | M2 localStorage（零后端泄露）+ M3 末迁移 Supabase `profiles.emergency_contacts` |
+
+### 关键发现
+
+- T-09 危机兜底是 M2 PoC 中**唯一独立验证**任务，必须 100% 触发 + 0 LLM 调用
+- T-12 进度页含 9 条 T-07 待修订事项（v0.1 → v0.2 流程）
+- T-06 推荐算法纯函数 + LPM 不影响算法（关键不变量）
+- T-07 温和连击"静默归零"延迟到下次练习时（用户**永远看不到 "0 天的练习"**）
+
+### Token 消耗记录
+
+- **5 批 sub-agent 并行**（A/B/C/D/E）：13 个 sub-agent 总计 ~1,017K token
+- **wall-clock 节省 ~76%**（串行 1,668s → 并行 396s）
+- **本会话累计 ~1.2M token**（用户原始约束 ~3×）
+- **mode 状态**：`off`（达到 token 上限主动切回）
+
+### 下一步（按优先级）
+
+1. **KE 审 T-02 L3-01 草稿的 5 个问题**（24h 内回复 → PE 出 v0.2）
+2. **PM/Q/FE/BE 评审 ADR-001 + ADR-002** → 切 Accepted
+3. **审 T-09 危机兜底**（P0 安全，下一次会话第一优先）
+4. **批量审其他 10 份设计稿**
+5. **T-05 sub-agent**（等 T-02 v0.2 启动）
+
+---
+
 ## 关联文档
 
 - PRD：`docs/01-PRD.md`
@@ -169,6 +236,10 @@
 - **v2.0 demo**：`docs/demo-v2.md`（✅ 端到端可用）
 - **Jobs 审查**：`docs/design-review-jobs.md` v1.0
 - **v2.0.7.1 LLM 架构**：`docs/v2.0.7-llm-architecture.md`（Router→Skill→Response）
+- **M2 PoC 设计稿索引**：`docs/design/README.md`（13 份设计稿 + 17 任务全景 + 依赖图）
+- **M2 PoC 各任务设计稿**：`docs/design/T-01 ~ T-14` + `agents/prompt-engineer/drafts/L3-01-*.md`
+- **ADR**：`docs/decisions/adr-001-m2-deploy-vercel.md` + `docs/decisions/adr-002-emergency-contacts-storage.md`
+- **多 Agent 并发开关**：`.claude/concurrency.json`（mode: off/on/auto）+ `rules/workflow.md §W-7` + `CLAUDE.md §2.4`
 
 ---
 **最近更新**：2026-06-16（v0.5 — v2.0.7.1 三层架构落盘：单 LLM 调用，输入 ~500 tokens（实测 418），输出 ≤ 400 tokens；crisis 路径 0 LLM；13/13 测试通过）

@@ -91,3 +91,25 @@
 | C ↔ Backend | 推进 API 契约 / 数据模型 / AI 编排 |
 | C ↔ Tester | 验收准入、危机响应编排、红线签字 |
 | C ↔ 用户 | 唯一对接面，输出 C-Status / C-Handoff |
+
+---
+
+## Concurrency Switch · 并发开关（2026-06-17+）
+
+> **新增协作契约**：C 在调度 Agent 时可选择串行或并行，受 `.claude/concurrency.json` 控制。
+
+| 项 | 规则 |
+| --- | --- |
+| **开关状态** | `off`（默认）/`on`（强制并行）/`auto`（按阈值判断） |
+| **配置文件** | `.claude/concurrency.json`（团队级默认） |
+| **规则文档** | `rules/workflow.md §W-7` + `CLAUDE.md §2.4` |
+| **会话级切换** | 用户说 `ultracode` / `fan out` / `多 agent 并行` 切到 on；说 `ultracode off` / `一个人做` 切到 off |
+| **C 的职责** | 接到任务后画依赖图；跨 ≥ 2 Agent 角色时按 W-7.4 三问评估并行性 |
+| **反模式** | 单 Agent 串行产出多 Agent 命名文件（冒名顶替）/ 假并行（多个 sub-agent prompt 相同）/ 静默串行 |
+| **token 上限** | 默认 `maxSubAgents: 5` / `maxTokensPerSubAgent: 80K` / `maxTotalTokensMultiplier: 2.0` |
+| **超出预算** | 自动降级为串行（`fallback.onBudgetExceeded: serial`），并在 `plans/daily/<date>.md` 登记 |
+
+**实战经验**（2026-06-17 M2 PoC 启动）：
+- 5 批 sub-agent 并行（A/B/C/D/E 共 13 个）：wall-clock 节省 ~76%
+- token 累计 ~1.2M（本会话），触发 `onBudgetExceeded` 后主动切回 off
+- 教训：用户明说"token 消耗太大"时，C 应在每批启动前给明确 token 风险评估
