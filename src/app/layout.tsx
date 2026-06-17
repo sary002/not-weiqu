@@ -26,6 +26,34 @@ export const metadata: Metadata = {
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
+  // v2.0.7.8 (社交分享) Open Graph + Twitter Card
+  openGraph: {
+    type: 'website',
+    locale: 'zh_CN',
+    title: '不委屈 — 帮善良的人学会有锋芒',
+    description: '不委屈是成长陪伴，不替代专业心理咨询与诊疗。AI 教练陪你在 12 步演练里学会说"不"。',
+    siteName: '不委屈',
+    images: [
+      {
+        url: '/og-card.png',
+        width: 1200,
+        height: 630,
+        alt: '不委屈 — 帮善良的人学会有锋芒',
+      },
+      {
+        url: '/og-card-square.png',
+        width: 1200,
+        height: 1200,
+        alt: '不委屈 Logo',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '不委屈 — 帮善良的人学会有锋芒',
+    description: 'AI 教练陪你在 12 步演练里学会说"不"。',
+    images: ['/og-card.png'],
+  },
 };
 
 export const viewport: Viewport = {
