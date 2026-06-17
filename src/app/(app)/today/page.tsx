@@ -1,9 +1,19 @@
 // src/app/(app)/today/page.tsx
-// v2.0.7.3 (ADR-003 + 完全多邻国化) 边界成长路 · 关卡地图
+// v2.0.7.4 (ADR-003 + 完全多邻国化 + 语义化图标) 边界成长路 · 关卡地图
 // 来自 docs/decisions/adr-003-ui-visual-language-v2.md + 多邻国关卡地图参考
-// 设计：5 段分组，节点左右偏移（之字形），S 形 SVG 曲线连接
+// 设计：5 段分组，节点左右偏移（之字形），S 形 SVG 曲线连接，圆内语义化图标
 import Link from 'next/link';
 import { Fragment } from 'react';
+import {
+  Activity,
+  Tag,
+  Eye,
+  Lightbulb,
+  Hand,
+  Scale,
+  Wallet,
+  Home,
+} from 'lucide-react';
 import { SkillNode, type SkillStatus } from '@/components/skilltree/SkillNode';
 
 interface SkillSeed {
@@ -61,7 +71,18 @@ function ZigzagConnector({
 }
 
 export default function TodayPage() {
-  // 5 段技能树骨架
+  // 5 段技能树骨架 + 语义化图标映射
+  const iconMap: Record<string, React.ReactNode> = {
+    'l1-body-awareness': <Activity />,      // 听见身体的信号 → 心电图
+    'l1-emotion-naming': <Tag />,           // 给情绪命名 → 标签
+    'l1-pattern-spotting': <Eye />,         // 看见讨好模式 → 眼睛
+    'family-marriage': <Lightbulb />,       // 说出"我想要" → 灯泡
+    'family-money': <Hand />,               // 说出"我不想" → 手（拒绝）
+    'partner-cold': <Scale />,              // 区分我的/别人的 → 天平
+    'friend-borrow': <Wallet />,            // 拒绝朋友借钱 → 钱包
+    'in-laws': <Home />,                    // 应对家庭聚会 → 房子
+  };
+
   const sections: SectionSeed[] = [
     {
       id: 's1',
@@ -78,8 +99,8 @@ export default function TodayPage() {
       layer: 'L2',
       name: '命名',
       skills: [
-        { id: 's2-want', title: '说出"我想要"', code: 'family-marriage', practiced: 0, status: 'recommended' },
-        { id: 's2-wont', title: '说出"我不想"', code: 'family-money', practiced: 0, status: 'available' },
+        { id: 's2-want', title: '说出我想要', code: 'family-marriage', practiced: 0, status: 'recommended' },
+        { id: 's2-wont', title: '说出我不想', code: 'family-money', practiced: 0, status: 'available' },
         { id: 's2-mine', title: '区分我的/别人的', code: 'partner-cold', practiced: 0, status: 'available' },
       ],
     },
@@ -149,6 +170,7 @@ export default function TodayPage() {
                           practiced={sk.practiced}
                           status={sk.status}
                           draftStep={sk.draftStep}
+                          icon={sk.code ? iconMap[sk.code] ?? <Eye /> : <Eye />}
                         />
                       </li>
                       {i < s.skills.length - 1 && (
